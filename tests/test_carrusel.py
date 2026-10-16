@@ -88,4 +88,4 @@ def test_fechas_en_espanol():
     assert fechas.nombre_fecha(LUNES) == "Lunes 19 de octubre"
     assert fechas.nombre_fecha(date(2026, 9, 16)) == "Miércoles 16 de septiembre"
     assert fechas.inicio(LUNES).utcoffset().total_seconds() == -6 * 3600   # CDMX sin horario de verano
-    assert fechas.proximos_rosarios(date(2026, 10, 17), 7) == [LUNES, VIERNES]
+    assert fechas.proximos_eventos(date(2026, 10, 17), 7) == [LUNES, VIERNES]

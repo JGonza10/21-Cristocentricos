@@ -190,7 +190,7 @@ class Integrante(db.Model):
 
 
 class Turno(db.Model):
-    """Quién dirige y quién apoya en un rosario."""
+    """Quién dirige y quién apoya en un evento."""
     __tablename__ = "turnos"
     __table_args__ = (db.UniqueConstraint("fecha", "integrante_id"),)
 
@@ -208,7 +208,7 @@ class Turno(db.Model):
 
 
 class EventoCalendario(db.Model):
-    """El evento de Google Calendar de cada rosario (para actualizarlo si cambian los turnos)."""
+    """La cita de Google Calendar de cada evento (para actualizarlo si cambian los turnos)."""
     __tablename__ = "eventos_calendario"
 
     fecha = db.Column(db.Date, primary_key=True)

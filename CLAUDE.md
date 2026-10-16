@@ -4,7 +4,7 @@
 > con explicaciones simples y prácticas. Código en **Python** o **bash/PowerShell**.
 
 ## 1. Qué es
-Sistema que convierte cada **Santo Rosario en vivo** (lunes y viernes, 10–11 am, hora CDMX)
+Sistema que convierte cada **evento en vivo** (lunes y viernes, 10–11 am, hora CDMX)
 en **3 reels** y un **carrusel de invitación (5 imágenes)**, con una **bandeja de aprobación**:
 nada se publica sin visto bueno humano.
 
@@ -39,7 +39,7 @@ nada se publica sin visto bueno humano.
 2. Busca frases clave: "primer/segundo/.../quinto misterio", "intención", "Dios te salve", "Gloria", cierre.
 3. Arma candidatos de 30–55 s que empiecen al inicio de una frase y terminen al final de otra.
 4. Puntúa: anuncio de misterio > intenciones > oración completa; evita silencios (ffmpeg `silencedetect`).
-5. Elige 3 sin traslape, repartidos en el rosario. Subtítulos `.srt` quemados con ffmpeg + nombre del canal.
+5. Elige 3 sin traslape, repartidos en el evento. Subtítulos `.srt` quemados con ffmpeg + nombre del canal.
 6. Texto y hashtags salen de plantillas por tipo de misterio (gozosos/dolorosos).
 7. Si algo falla, la bandeja permite ajustar inicio/fin a mano antes de aprobar.
 
@@ -113,7 +113,7 @@ con títulos en **Spectral** 700 y texto en Public Sans. Fuentes TTF en `assets/
 - **Pestañas**: Inicio · Contenido · Evento · Configuración (en celular dice "Ajustes").
 - **Inicio**: tarjeta principal del próximo evento (degradado), 3 tarjetas de estado (Bandeja, Agentes,
   Invitaciones), "Esta semana y la que sigue" (lun/vie con botón Ver) y "Agenda editorial".
-- **Contenido**: bandeja de aprobación (fases 2–5). **Evento**: detalle de un rosario, turnos y reloj.
+- **Contenido**: bandeja de aprobación (fases 2–5). **Evento**: detalle de un evento, turnos y reloj.
 - **Configuración**: cuenta y seguridad.
 
 ### 4.7 Componentes
@@ -193,3 +193,6 @@ Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos compl
 | 4 | IA para reels | Solo local, reglas simples, sin API de pago |
 | 5 | Usuarios | Gonza + 1 aprobador, mismo permiso |
 | 6 | Acceso remoto | Aprobador en otra PC vía Tailscale (máquina compartida), sin abrir puertos |
+
+## Palabra "evento" en vez de "rosario" (Gonza, 2026-10-16)
+Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js`, `proximoEvento`, `es_dia_de_evento`, `proximos_eventos`, `APOYOS_POR_EVENTO`; `APOYOS_POR_ROSARIO` sigue aceptándose como respaldo). Se quedan a propósito: los hashtags `#SantoRosario` / `#RosarioEnVivo` (búsqueda en redes), la pista de Whisper en `servicios/whisper.py` (reconoce las oraciones) y los nombres de los misterios. No reintroducir "rosario" en textos nuevos.

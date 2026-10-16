@@ -1,4 +1,4 @@
-"""Invitaciones de Google Calendar para cada rosario."""
+"""Invitaciones de Google Calendar para cada evento."""
 from datetime import date
 
 from agentes import fechas
@@ -8,7 +8,7 @@ from . import google
 
 def sincronizar(fecha: date, calendario_id: str, titulo: str, descripcion: str,
                 correos: list[str], google_id: str | None) -> str:
-    """Crea o actualiza el evento del rosario con los invitados. Devuelve el id del evento.
+    """Crea o actualiza el evento del evento con los invitados. Devuelve el id del evento.
 
     Google manda el correo de invitación (o de cambio) a cada invitado: sendUpdates="all".
     """

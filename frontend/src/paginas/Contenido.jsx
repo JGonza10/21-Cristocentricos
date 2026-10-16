@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { nombreFecha } from '../rosario.js'
+import { nombreFecha } from '../evento.js'
 import { REDES, fechaDeClave, fechaHora, segundosATexto } from '../util.js'
 
 const FILTROS = [
@@ -9,7 +9,7 @@ const FILTROS = [
   { id: 'rechazado', nombre: 'Rechazados' },
 ]
 const VACIO = {
-  pendiente: 'No hay paquetes por revisar. Aquí aparecen los carruseles (2 días antes de cada rosario) y los reels (cuando llega la grabación).',
+  pendiente: 'No hay paquetes por revisar. Aquí aparecen los carruseles (2 días antes de cada evento) y los reels (cuando llega la grabación).',
   aprobado: 'Todavía no apruebas ningún paquete.',
   rechazado: 'No hay paquetes rechazados.',
 }
@@ -145,7 +145,7 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
     <article className="tarjeta paquete" aria-labelledby={`paq-${p.id}`}>
       <div className="paq-cabeza">
         <span className="pill">{p.tipo}</span>
-        <span className="muted chico-texto">Rosario del {nombreFecha(fechaDeClave(p.fecha_evento)).toLowerCase()}</span>
+        <span className="muted chico-texto">Evento del {nombreFecha(fechaDeClave(p.fecha_evento)).toLowerCase()}</span>
       </div>
       <h3 id={`paq-${p.id}`}>{p.titulo}</h3>
 

@@ -1,6 +1,6 @@
 # Cristocéntricos Automático
 
-Convierte cada Santo Rosario en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
+Convierte cada evento en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
 invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
 
 **Estado:** las 8 fases del plan están programadas y probadas (ver `CLAUDE.md`). Falta conectarlas
@@ -123,7 +123,7 @@ Todo se hace en tu PC, sin pagar ninguna API:
 1. Whisper escribe lo que se dijo, con el segundo exacto de cada frase.
 2. Busca frases clave: «primer… quinto misterio» (vale más), «intenciones», oraciones y el cierre.
 3. Arma tramos de 30 a 55 s que empiezan al inicio de una frase y terminan al final de otra.
-4. Castiga los silencios (`silencedetect` de ffmpeg) y elige 3 sin encimarse, uno por tercio del rosario.
+4. Castiga los silencios (`silencedetect` de ffmpeg) y elige 3 sin encimarse, uno por tercio del evento.
 5. ffmpeg lo pasa a vertical 1080×1920: el video al centro sobre su propio fondo difuminado,
    subtítulos y el nombre del canal.
 
@@ -189,7 +189,7 @@ mano se prepara sola.
 | `CANAL_NOMBRE` | Nombre en carruseles, reels y overlay | `Cristocéntricos` |
 | `CANAL_ENLACE` | Enlace del canal (opcional) en el carrusel | `youtube.com/@...` |
 | `WHISPER_MODELO` | Modelo de transcripción | `small` |
-| `APOYOS_POR_ROSARIO` | Cuántos apoyan además de quien dirige | `1` |
+| `APOYOS_POR_EVENTO` | Cuántos apoyan además de quien dirige | `1` |
 | `GOOGLE_CALENDAR_ID` | Calendario de las invitaciones | `primary` |
 | `META_AUTO` | Publicación automática en Meta | `0` |
 | `META_PAGE_ID` / `META_IG_USER_ID` | IDs de la página y de Instagram | números |
@@ -201,7 +201,7 @@ flask --app app crear-usuario
 flask --app app cambiar-password gonza
 flask --app app paquete-demo   # paquetes de ejemplo en la bandeja
 flask --app app carrusel 2026-10-19 [--forzar]
-flask --app app reels-reintentar rosario.mkv
+flask --app app reels-reintentar evento.mkv
 flask --app app repartir       # turnos vacíos de las próximas 2 semanas
 flask --app app google-autorizar
 python -m agentes.worker       # la ventana de agentes, a mano

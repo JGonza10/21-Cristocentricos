@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { agendaEditorial, fechaCorta, proximoRosario, semanaYSiguiente } from '../rosario.js'
+import { agendaEditorial, fechaCorta, proximoEvento, semanaYSiguiente } from '../evento.js'
 import { nombres } from '../util.js'
 
 const ETIQUETA_ESTADO = { pasado: 'ya pasó', 'hoy-terminado': 'hoy, ya pasó', hoy: 'hoy', 'en-vivo': 'en vivo' }
@@ -26,7 +26,7 @@ export default function Inicio({ ir }) {
     return () => clearInterval(t)
   }, [])
 
-  const proximo = proximoRosario(ahora)
+  const proximo = proximoEvento(ahora)
   const semana = semanaYSiguiente(ahora)
   const agenda = agendaEditorial(ahora)
   const tProximo = proximo && turnos[proximo.clave]
@@ -78,7 +78,7 @@ export default function Inicio({ ir }) {
             : <div className="estado warn">Google sin autorizar</div>}
           <p className="chico-texto">
             {estado?.google
-              ? 'Cada quien recibe en su calendario los rosarios que le tocan.'
+              ? 'Cada quien recibe en su calendario los eventos que le tocan.'
               : <>Ve a <button className="enlace" onClick={() => ir('configuracion')}>Ajustes</button> para ver cómo conectarlo.</>}
           </p>
         </article>

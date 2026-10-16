@@ -36,7 +36,7 @@ def repartir(dias: list[date]) -> list[Turno]:
     """Llena los huecos (quién dirige y quién apoya) de cada día. No cambia lo ya asignado."""
     if not dias:
         return []
-    apoyos = current_app.config["APOYOS_POR_ROSARIO"]
+    apoyos = current_app.config["APOYOS_POR_EVENTO"]
     carga = _carga(min(dias) - timedelta(DIAS_HISTORIAL))
     activos = Integrante.query.filter_by(activo=True).order_by(Integrante.id).all()
     nuevos = []
@@ -81,7 +81,7 @@ def tarea_reparto() -> list[Turno]:
 
 def _descripcion(f: date) -> str:
     t = turnos_de(f)
-    m = fechas.misterios(f)["nombre"] if fechas.es_dia_de_rosario(f) else "Santo Rosario"
+    m = fechas.misterios(f)["nombre"] if fechas.es_dia_de_evento(f) else "Evento"
     lineas = [f"{m} · 10:00 a 11:00 am (hora CDMX)", ""]
     if t["dirige"]:
         lineas.append(f"Dirige: {t['dirige'].integrante.nombre}")
@@ -97,7 +97,7 @@ def sincronizar_invitaciones(dias: int = 14) -> int:
         return 0
     hoy = fechas.hoy_cdmx()
     tocados = 0
-    for f in fechas.proximos_rosarios(hoy, dias):
+    for f in fechas.proximos_eventos(hoy, dias):
         t = turnos_de(f)
         participantes = ([t["dirige"]] if t["dirige"] else []) + t["apoyan"]
         correos = sorted({x.integrante.correo for x in participantes if x.integrante.correo})
@@ -109,7 +109,7 @@ def sincronizar_invitaciones(dias: int = 14) -> int:
         try:
             ev.google_id = calendario.sincronizar(
                 f, current_app.config["GOOGLE_CALENDAR_ID"],
-                f"Santo Rosario en vivo · {fechas.nombre_fecha(f)}", _descripcion(f), correos, ev.google_id)
+                f"Evento en vivo · {fechas.nombre_fecha(f)}", _descripcion(f), correos, ev.google_id)
             ev.invitados, ev.estado, ev.error = correos, "enviada", None
             tocados += 1
         except Exception:  # noqa: BLE001

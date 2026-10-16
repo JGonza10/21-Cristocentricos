@@ -1,4 +1,4 @@
-"""Fechas de los rosarios: lunes (gozosos) y viernes (dolorosos), 10 a 11 am, hora CDMX."""
+"""Fechas de los eventos: lunes (gozosos) y viernes (dolorosos), 10 a 11 am, hora CDMX."""
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -45,7 +45,7 @@ def hoy_cdmx() -> date:
     return ahora_cdmx().date()
 
 
-def es_dia_de_rosario(d: date) -> bool:
+def es_dia_de_evento(d: date) -> bool:
     return d.weekday() in MISTERIOS
 
 
@@ -66,9 +66,9 @@ def fin(d: date) -> datetime:
     return datetime.combine(d, HORA_FIN, CDMX)
 
 
-def proximos_rosarios(desde: date, dias: int) -> list[date]:
-    """Días de rosario entre `desde` y `desde + dias` (incluidos)."""
-    return [desde + timedelta(n) for n in range(dias + 1) if es_dia_de_rosario(desde + timedelta(n))]
+def proximos_eventos(desde: date, dias: int) -> list[date]:
+    """Días de evento entre `desde` y `desde + dias` (incluidos)."""
+    return [desde + timedelta(n) for n in range(dias + 1) if es_dia_de_evento(desde + timedelta(n))]
 
 
 def fecha_de_grabacion(momento: datetime) -> date:

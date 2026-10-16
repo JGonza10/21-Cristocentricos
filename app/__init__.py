@@ -52,7 +52,7 @@ def create_app(config: dict | None = None) -> Flask:
         CANAL_NOMBRE=os.environ.get("CANAL_NOMBRE", "Cristocéntricos"),
         CANAL_ENLACE=os.environ.get("CANAL_ENLACE", ""),
         WHISPER_MODELO=os.environ.get("WHISPER_MODELO", "small"),
-        APOYOS_POR_ROSARIO=int(os.environ.get("APOYOS_POR_ROSARIO", "1")),
+        APOYOS_POR_EVENTO=int(os.environ.get("APOYOS_POR_EVENTO") or os.environ.get("APOYOS_POR_ROSARIO", "1")),
         GOOGLE_CALENDAR_ID=os.environ.get("GOOGLE_CALENDAR_ID", "primary"),
         META_AUTO=os.environ.get("META_AUTO", "0") == "1",
         META_PAGE_ID=os.environ.get("META_PAGE_ID", ""),

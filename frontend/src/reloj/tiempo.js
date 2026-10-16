@@ -1,5 +1,5 @@
-// Reloj de la CDMX y cuenta regresiva al rosario (lo usan la pestaña Evento y el overlay).
-import { ahoraCDMX, proximoRosario } from '../rosario.js'
+// Reloj de la CDMX y cuenta regresiva al evento (lo usan la pestaña Evento y el overlay).
+import { ahoraCDMX, proximoEvento } from '../evento.js'
 
 const HORA_MS = 3_600_000
 const CDMX_A_UTC_MS = 6 * HORA_MS // CDMX = UTC-6 (sin horario de verano desde 2022)
@@ -12,15 +12,15 @@ export function horaCDMX(ahora = new Date()) {
   return `${dos(c.getUTCHours())}:${dos(c.getUTCMinutes())}:${dos(c.getUTCSeconds())}`
 }
 
-/** Estado del rosario para el overlay: antes (con cuenta regresiva), en vivo o sin evento hoy. */
+/** Estado del evento para el overlay: antes (con cuenta regresiva), en vivo o sin evento hoy. */
 export function estadoReloj(ahora = new Date()) {
-  const r = proximoRosario(ahora)
+  const r = proximoEvento(ahora)
   if (!r) return { modo: 'nada' }
   const inicio = r.fecha.getTime() + 10 * HORA_MS + CDMX_A_UTC_MS
   const fin = inicio + HORA_MS
   const t = ahora.getTime()
-  if (t >= inicio && t < fin) return { modo: 'vivo', rosario: r, restante: fin - t }
-  return { modo: 'antes', rosario: r, faltan: inicio - t }
+  if (t >= inicio && t < fin) return { modo: 'vivo', evento: r, restante: fin - t }
+  return { modo: 'antes', evento: r, faltan: inicio - t }
 }
 
 /** 3725000 ms → "1:02:05"; menos de una hora → "02:05"; más de un día → "2 días" */

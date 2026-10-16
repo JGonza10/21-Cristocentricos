@@ -55,8 +55,8 @@ def registrar(app):
         hoy = date.today()
         lunes = hoy + timedelta(days=(0 - hoy.weekday()) % 7 or 7)
         crear_paquete(
-            "carrusel", lunes, f"Invitación al rosario del lunes {lunes.day}",
-            "Te invitamos a rezar juntos el Santo Rosario en vivo este lunes a las 10:00 am "
+            "carrusel", lunes, f"Invitación al evento del lunes {lunes.day}",
+            "Te invitamos a rezar juntos en el evento en vivo este lunes a las 10:00 am "
             "(hora CDMX). Meditaremos los misterios gozosos.\n\n"
             "Deja tus intenciones en los comentarios.\n\n#SantoRosario #Cristocéntricos #MisteriosGozosos")
         crear_paquete(
@@ -68,7 +68,7 @@ def registrar(app):
     @click.argument("fecha")
     @click.option("--forzar", is_flag=True, help="Genera otro aunque ya exista uno para esa fecha.")
     def carrusel(fecha, forzar):
-        """Genera ya el carrusel de un rosario. Ejemplo: flask --app app carrusel 2026-10-19"""
+        """Genera ya el carrusel de un evento. Ejemplo: flask --app app carrusel 2026-10-19"""
         from agentes.carrusel import preparar_carrusel
         try:
             f = date.fromisoformat(fecha)
@@ -81,7 +81,7 @@ def registrar(app):
     @app.cli.command("reels-reintentar")
     @click.argument("archivo")
     def reels_reintentar(archivo):
-        """Vuelve a procesar una grabación que falló. Ejemplo: flask --app app reels-reintentar rosario.mkv"""
+        """Vuelve a procesar una grabación que falló. Ejemplo: flask --app app reels-reintentar evento.mkv"""
         from .modelos import Grabacion
         g = Grabacion.query.filter_by(nombre=archivo).first()
         if g is None:
@@ -93,9 +93,9 @@ def registrar(app):
     @app.cli.command("repartir")
     def repartir():
         """Reparte ya los turnos vacíos de las próximas 2 semanas."""
-        from agentes.fechas import hoy_cdmx, proximos_rosarios
+        from agentes.fechas import hoy_cdmx, proximos_eventos
         from agentes.turnos import repartir as repartir_turnos
-        nuevos = repartir_turnos(proximos_rosarios(hoy_cdmx(), 14))
+        nuevos = repartir_turnos(proximos_eventos(hoy_cdmx(), 14))
         click.echo(f"{len(nuevos)} turnos asignados.")
 
     @app.cli.command("google-autorizar")

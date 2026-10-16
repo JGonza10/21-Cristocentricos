@@ -40,7 +40,7 @@ function AvisoPrivacidad({ canal }) {
       <summary>Leer el aviso de privacidad</summary>
       <p>
         <b>Aviso de privacidad simplificado.</b> {canal} usa tu nombre y tu correo electrónico únicamente para
-        asignarte turnos en el Santo Rosario y enviarte la invitación a tu calendario (Google Calendar). No se
+        asignarte turnos en los eventos y enviarte la invitación a tu calendario (Google Calendar). No se
         venden, no se comparten con nadie más y no se usan para otros fines. Se guardan en la computadora del
         equipo. Puedes pedir en cualquier momento que se corrijan o se borren (derechos ARCO) con la persona que
         coordina el equipo.
@@ -148,7 +148,7 @@ function Equipo({ canal }) {
           <input id="eq-correo" type="email" value={correo} maxLength={120} required autoComplete="off" inputMode="email"
             onChange={(e) => setCorreo(e.target.value)} />
         </div>
-        <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir el rosario</label>
+        <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir el evento</label>
         <label className="casilla"><input type="checkbox" checked={aviso} onChange={(e) => setAviso(e.target.checked)} required /> Le informé el aviso de privacidad y está de acuerdo</label>
         <AvisoPrivacidad canal={canal} />
         {error && <p className="error" role="alert">{error}</p>}

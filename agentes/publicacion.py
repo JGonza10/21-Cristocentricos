@@ -41,7 +41,7 @@ def texto_para(p: Paquete, red: str) -> str:
 
 
 def titulo_youtube(p: Paquete) -> str:
-    return f"{p.titulo} · Santo Rosario #Shorts"[:100]
+    return f"{p.titulo} · Evento en vivo #Shorts"[:100]
 
 
 def carpeta_manual(p: Paquete, red: str) -> str:

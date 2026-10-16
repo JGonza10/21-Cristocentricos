@@ -160,24 +160,24 @@ def _resumen(f: date) -> dict:
 @bp.get("/turnos")
 @login_requerido
 def ver_turnos():
-    from agentes.fechas import es_dia_de_rosario, hoy_cdmx
+    from agentes.fechas import es_dia_de_evento, hoy_cdmx
     desde = _fecha(request.args["desde"]) if "desde" in request.args else hoy_cdmx() - timedelta(7)
     hasta = _fecha(request.args["hasta"]) if "hasta" in request.args else desde + timedelta(21)
     if hasta < desde or (hasta - desde).days > MAX_DIAS_CONSULTA:
         raise ErrorEquipo("Rango de fechas no válido.")
     dias = [desde + timedelta(n) for n in range((hasta - desde).days + 1)]
-    return jsonify(turnos={f.isoformat(): _resumen(f) for f in dias if es_dia_de_rosario(f)})
+    return jsonify(turnos={f.isoformat(): _resumen(f) for f in dias if es_dia_de_evento(f)})
 
 
 @bp.put("/turnos/<fecha>")
 @login_requerido
 def asignar(fecha: str):
-    from agentes.fechas import es_dia_de_rosario, hoy_cdmx
+    from agentes.fechas import es_dia_de_evento, hoy_cdmx
     f = _fecha(fecha)
-    if not es_dia_de_rosario(f):
-        raise ErrorEquipo("Solo hay rosario los lunes y viernes.")
+    if not es_dia_de_evento(f):
+        raise ErrorEquipo("Solo hay evento los lunes y viernes.")
     if f < hoy_cdmx():
-        raise ErrorEquipo("Ese rosario ya pasó.")
+        raise ErrorEquipo("Ese evento ya pasó.")
     d = _datos()
     dirige, apoyan = d.get("dirige"), d.get("apoyan", [])
     if dirige is not None and (not isinstance(dirige, int) or isinstance(dirige, bool)):
@@ -207,7 +207,7 @@ def asignar(fecha: str):
 @login_requerido
 def repartir_ahora():
     """Llena los huecos de las próximas 2 semanas sin esperar al domingo."""
-    from agentes.fechas import hoy_cdmx, proximos_rosarios
+    from agentes.fechas import hoy_cdmx, proximos_eventos
     from agentes.turnos import repartir
-    nuevos = repartir(proximos_rosarios(hoy_cdmx(), 14))
+    nuevos = repartir(proximos_eventos(hoy_cdmx(), 14))
     return jsonify(asignados=len(nuevos))

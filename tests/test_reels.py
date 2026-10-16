@@ -17,7 +17,7 @@ from .conftest import enviar, login
 hay_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg no instalado")
 
 
-def rosario_falso(duracion=600, paso=5.0, especiales=None):
+def evento_falso(duracion=600, paso=5.0, especiales=None):
     """Segmentos de 5 s con 'Dios te salve' y algunas frases clave en ciertos segundos."""
     especiales = especiales or {}
     segs, t = [], 0.0
@@ -30,7 +30,7 @@ def rosario_falso(duracion=600, paso=5.0, especiales=None):
 # --- Reglas de elección (§2.1) ------------------------------------------------------
 
 def test_elige_3_momentos_sin_traslape_y_con_duracion_correcta():
-    segs = rosario_falso(especiales={100: "Primer misterio gozoso: la Anunciación",
+    segs = evento_falso(especiales={100: "Primer misterio gozoso: la Anunciación",
                                      300: "Pedimos por las intenciones de todos ustedes",
                                      560: "En el nombre del Padre, del Hijo y del Espíritu Santo"})
     momentos = reels.elegir_momentos(segs, [], 600)
@@ -46,21 +46,21 @@ def test_elige_3_momentos_sin_traslape_y_con_duracion_correcta():
 
 
 def test_anuncio_de_misterio_gana_a_intenciones():
-    segs = rosario_falso(duracion=300, especiales={50: "Tercer misterio doloroso", 200: "Sus intenciones"})
+    segs = evento_falso(duracion=300, especiales={50: "Tercer misterio doloroso", 200: "Sus intenciones"})
     mejor = reels.elegir_momentos(segs, [], 300, cuantos=1)[0]
     assert mejor["inicio"] == 50 and mejor["ordinal"] == "tercer"
 
 
 def test_evita_silencios():
-    segs = rosario_falso(duracion=300, especiales={50: "Segundo misterio", 200: "Cuarto misterio"})
+    segs = evento_falso(duracion=300, especiales={50: "Segundo misterio", 200: "Cuarto misterio"})
     silencio_largo = [(55.0, 90.0)]
     mejor = reels.elegir_momentos(segs, silencio_largo, 300, cuantos=1)[0]
     assert mejor["inicio"] == 200
 
 
-def test_reparte_en_el_rosario():
+def test_reparte_en_el_evento():
     """Aunque los mejores estén juntos al inicio, toma uno por tercio si puede."""
-    segs = rosario_falso(duracion=900, especiales={0: "Primer misterio", 60: "Segundo misterio",
+    segs = evento_falso(duracion=900, especiales={0: "Primer misterio", 60: "Segundo misterio",
                                                    120: "Tercer misterio"})
     momentos = reels.elegir_momentos(segs, [], 900)
     tercios = {int(m["inicio"] // 300) for m in momentos}
@@ -68,7 +68,7 @@ def test_reparte_en_el_rosario():
 
 
 def test_grabacion_muy_corta_no_da_momentos():
-    assert reels.elegir_momentos(rosario_falso(duracion=20), [], 20) == []
+    assert reels.elegir_momentos(evento_falso(duracion=20), [], 20) == []
     assert reels.elegir_momentos([], [], 600) == []
 
 
@@ -118,7 +118,7 @@ def test_espera_a_que_termine_de_copiarse(app, monkeypatch):
     with app.app_context():
         carpeta = Path(app.config["GRABACIONES_DIR"])
         carpeta.mkdir(parents=True)
-        video = carpeta / "rosario.mkv"
+        video = carpeta / "evento.mkv"
         video.write_bytes(b"x" * 10)
         (carpeta / "notas.txt").write_text("no es video")
         reels.revisar_carpeta()                     # 1a vuelta: solo se registra
@@ -128,7 +128,7 @@ def test_espera_a_que_termine_de_copiarse(app, monkeypatch):
         reels.revisar_carpeta()
         assert llamadas == []
         reels.revisar_carpeta()                     # ya no cambió y lleva >60 s quieto
-        assert llamadas == ["rosario.mkv"]
+        assert llamadas == ["evento.mkv"]
 
 
 def test_grabacion_sin_voz_queda_con_error_amable(app, monkeypatch):
@@ -165,11 +165,11 @@ def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
     with app.app_context():
         carpeta = Path(app.config["GRABACIONES_DIR"])
         carpeta.mkdir(parents=True)
-        video = carpeta / "rosario-lunes.mp4"
+        video = carpeta / "evento-lunes.mp4"
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=15",
                         "-f", "lavfi", "-i", "sine=frequency=440", "-t", "50", "-c:v", "libx264", "-preset",
                         "ultrafast", "-c:a", "aac", str(video)], check=True)
-        segs = rosario_falso(duracion=40, especiales={0: "Primer misterio gozoso, la Anunciación"})
+        segs = evento_falso(duracion=40, especiales={0: "Primer misterio gozoso, la Anunciación"})
         monkeypatch.setattr(reels.whisper, "transcribir", lambda r, m: segs)
         g = Grabacion(nombre=video.name, fecha_evento=date(2026, 10, 19), tamano=video.stat().st_size)
         db.session.add(g)

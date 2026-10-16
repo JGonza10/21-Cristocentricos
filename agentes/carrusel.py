@@ -134,7 +134,7 @@ def _invitacion(f: date) -> Image.Image:
     _marco(d, VINO_SUAVE)
     ancho = ANCHO - 2 * MARGEN
     _cruz(d, (ANCHO / 2, 250), 96, VINO)
-    _etiqueta(d, (0, 350), "Santo Rosario en vivo", ORO, 30, centrado_en=ANCHO / 2)
+    _etiqueta(d, (0, 350), "Evento en vivo", ORO, 30, centrado_en=ANCHO / 2)
     y = _parrafo(d, (MARGEN, 420), "Te invitamos a rezar juntos", _fuente("titulo", 104), TEXTO, ancho,
                  interlineado=1.08, centrado=True)
     # Bloque vino con la fecha y la hora
@@ -202,7 +202,7 @@ def _intenciones(f: date) -> Image.Image:
     y = _parrafo(d, (MARGEN + 20, 520), "¿Por quién quieres que recemos?", _fuente("titulo", 88), TEXTO,
                  ancho - 40, interlineado=1.08, centrado=True)
     _parrafo(d, (MARGEN + 40, y + 40),
-             "Escríbelas en los comentarios y las presentaremos a la Virgen María durante el rosario.",
+             "Escríbelas en los comentarios y las presentaremos a la Virgen María durante el evento.",
              _fuente("texto", 42), TEXTO, ancho - 80, interlineado=1.4, centrado=True)
     _pie(d, 4, TEXTO, ROSA_LINEA)
     return img
@@ -234,12 +234,12 @@ def texto_carrusel(f: date) -> str:
     enlace = current_app.config["CANAL_ENLACE"]
     canal = current_app.config["CANAL_NOMBRE"].replace(" ", "")
     lineas = [
-        "🙏 Santo Rosario en vivo",
+        "🙏 Evento en vivo",
         "",
         f"{fechas.nombre_fecha(f)} · 10:00 am (hora CDMX)",
         f"Meditaremos los {m['nombre'].lower()}.",
         "",
-        "Deja tus intenciones en los comentarios y las presentaremos a la Virgen durante el rosario.",
+        "Deja tus intenciones en los comentarios y las presentaremos a la Virgen durante el evento.",
     ]
     if enlace:
         lineas += ["", f"Síguelo en vivo: {enlace}"]
@@ -258,11 +258,11 @@ def generar_imagenes(f: date, carpeta: Path) -> list[str]:
 
 
 def preparar_carrusel(f: date, forzar: bool = False) -> Paquete | None:
-    """Genera el carrusel de un rosario y lo mete a la bandeja.
+    """Genera el carrusel de un evento y lo mete a la bandeja.
 
     No hace nada si ya hay uno (pendiente, aprobado o rechazado), salvo con `forzar=True`.
     """
-    if not fechas.es_dia_de_rosario(f):
+    if not fechas.es_dia_de_evento(f):
         raise ValueError(f"{f} no es lunes ni viernes.")
     existentes = Paquete.query.filter_by(tipo="carrusel", fecha_evento=f).count()
     if existentes and not forzar:
@@ -271,7 +271,7 @@ def preparar_carrusel(f: date, forzar: bool = False) -> Paquete | None:
     carpeta = Path(current_app.config["PAQUETES_DIR"]) / carpeta_rel
     archivos = generar_imagenes(f, carpeta)
     m = fechas.misterios(f)
-    return crear_paquete("carrusel", f, f"Invitación al rosario del {fechas.nombre_fecha(f).lower()}",
+    return crear_paquete("carrusel", f, f"Invitación al evento del {fechas.nombre_fecha(f).lower()}",
                          texto_carrusel(f), carpeta=carpeta_rel, archivos=archivos,
                          datos={"misterios": m["tipo"]})
 
@@ -280,11 +280,11 @@ def tarea() -> list[Paquete]:
     """Lo que corre el worker cada hora: prepara los carruseles de los próximos 2 días.
 
     Revisa hoy, mañana y pasado mañana; así, si la PC estuvo apagada justo 2 días antes,
-    se pone al corriente en cuanto se enciende (mientras el rosario no haya empezado).
+    se pone al corriente en cuanto se enciende (mientras el evento no haya empezado).
     """
     ahora = fechas.ahora_cdmx()
     nuevos = []
-    for f in fechas.proximos_rosarios(ahora.date(), 2):
+    for f in fechas.proximos_eventos(ahora.date(), 2):
         if ahora >= fechas.inicio(f):
             continue
         p = preparar_carrusel(f)

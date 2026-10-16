@@ -3,7 +3,7 @@
 Cuando llega una grabación a grabaciones/:
   1. faster-whisper la transcribe (con marcas de tiempo por segmento).
   2. Se buscan frases clave y se arman candidatos de 30 a 55 s (reglas de CLAUDE.md §2.1).
-  3. Se eligen 3 momentos sin traslape, repartidos en el rosario.
+  3. Se eligen 3 momentos sin traslape, repartidos en el evento.
   4. ffmpeg los pasa a vertical 9:16 con subtítulos y el nombre del canal.
   5. Cada reel entra a la bandeja como pendiente.
 """
@@ -37,7 +37,7 @@ PATRONES = [
     ("cierre", 1.5, re.compile(r"en el nombre del padre|bendici[oó]n|ave mar[ií]a pur[ií]sima", re.I)),
 ]
 ETIQUETAS = {"intenciones": "Intenciones", "oracion": "Oración", "cierre": "Cierre y bendición",
-             None: "Momento del rosario"}
+             None: "Momento del evento"}
 
 
 # --- Reglas para elegir los momentos (funciones puras, fáciles de probar) -----------
@@ -45,7 +45,7 @@ ETIQUETAS = {"intenciones": "Intenciones", "oracion": "Oración", "cierre": "Cie
 def _clasificar(texto: str, posicion: float) -> tuple[str | None, float, str | None]:
     """Tipo, peso y ordinal (si es anuncio de misterio) de un segmento de texto.
 
-    `posicion` va de 0 (inicio del rosario) a 1 (final): el cierre solo cuenta al final.
+    `posicion` va de 0 (inicio del evento) a 1 (final): el cierre solo cuenta al final.
     """
     for tipo, peso, patron in PATRONES:
         m = patron.search(texto)
@@ -104,7 +104,7 @@ def elegir_momentos(segmentos: list, silencios: list, duracion: float, cuantos: 
         return all(c["fin"] + 2 <= e["inicio"] or c["inicio"] >= e["fin"] + 2 for e in elegidos)
 
     usados = set()
-    for c in cands:                      # 1a pasada: un momento por tercio del rosario
+    for c in cands:                      # 1a pasada: un momento por tercio del evento
         t = min(int(c["inicio"] // tercio), 2)
         if len(elegidos) < cuantos and t not in usados and libre(c):
             elegidos.append(c)
@@ -152,10 +152,10 @@ def texto_reel(fecha, momento: dict, segmentos: list) -> str:
     frase = " ".join(s[2] for s in segmentos if s[1] > momento["inicio"] and s[0] < momento["fin"])
     frase = textwrap.shorten(frase, 180, placeholder="…") if frase else ""
     canal = current_app.config["CANAL_NOMBRE"].replace(" ", "")
-    m = fechas.misterios(fecha) if fechas.es_dia_de_rosario(fecha) else None
+    m = fechas.misterios(fecha) if fechas.es_dia_de_evento(fecha) else None
     lineas = [f"“{frase}”", ""] if frase else []
-    lineas.append(f"Santo Rosario · {m['nombre']} · {fechas.nombre_fecha(fecha)}" if m
-                  else f"Santo Rosario · {fechas.nombre_fecha(fecha)}")
+    lineas.append(f"Evento · {m['nombre']} · {fechas.nombre_fecha(fecha)}" if m
+                  else f"Evento · {fechas.nombre_fecha(fecha)}")
     lineas += ["Rezamos en vivo cada lunes y viernes a las 10:00 am (hora CDMX).", "",
                f"#SantoRosario #{canal} " + (f"#Misterios{m['tipo'].capitalize()} " if m else "")
                + "#Reels #Fe #Oración"]

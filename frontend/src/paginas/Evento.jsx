@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { infoRosario, proximoRosario } from '../rosario.js'
+import { infoEvento, proximoEvento } from '../evento.js'
 import { fechaDeClave, nombres } from '../util.js'
 
 const MAX_APOYOS = 3
 
 export default function Evento({ fecha, ir }) {
-  const r = fecha ? infoRosario(fechaDeClave(fecha)) : proximoRosario()
+  const r = fecha ? infoEvento(fechaDeClave(fecha)) : proximoEvento()
   if (!r) return <section className="tarjeta"><p className="vacio">No hay eventos próximos.</p></section>
   const yaPaso = r.estado === 'pasado' || r.estado === 'hoy-terminado'
   return (

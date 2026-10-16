@@ -135,8 +135,8 @@ def test_rango_de_consulta(sesion):
 
 def test_reparto_justo(app):
     ids = _gente(app, 3)
-    app.config["APOYOS_POR_ROSARIO"] = 1
-    dias = fechas.proximos_rosarios(LUNES, 20)        # 6 rosarios
+    app.config["APOYOS_POR_EVENTO"] = 1
+    dias = fechas.proximos_eventos(LUNES, 20)        # 6 eventos
     with app.app_context():
         nuevos = turnos.repartir(dias)
         assert len(nuevos) == 12
@@ -179,7 +179,7 @@ def test_semana_siguiente_desde_el_domingo():
 def test_boton_repartir_ahora(app, sesion):
     _gente(app, 2)
     r = enviar(sesion, "/api/turnos/repartir")
-    assert r.status_code == 200 and r.get_json()["asignados"] == 10     # hoy + 4 rosarios × (dirige + apoya)
+    assert r.status_code == 200 and r.get_json()["asignados"] == 10     # hoy + 4 eventos × (dirige + apoya)
 
 
 # --- Invitaciones de Google Calendar ------------------------------------------------

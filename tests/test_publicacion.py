@@ -67,7 +67,7 @@ def test_reel_sin_google_va_manual_tambien_a_youtube(app):
     pubs = _pubs(app, pid)
     assert pubs["youtube"]["estado"] == "listo_manual"
     texto = (Path(app.config["PAQUETES_DIR"]) / pubs["youtube"]["ruta"] / "texto.txt").read_text(encoding="utf-8")
-    assert texto.startswith("TÍTULO:\nreel de prueba · Santo Rosario #Shorts")
+    assert texto.startswith("TÍTULO:\nreel de prueba · Evento en vivo #Shorts")
 
 
 def test_reel_sube_a_youtube_en_privado(app, monkeypatch):
@@ -81,7 +81,7 @@ def test_reel_sube_a_youtube_en_privado(app, monkeypatch):
         publicacion.tarea()
     pubs = _pubs(app, pid)
     assert pubs["youtube"]["estado"] == "publicado" and pubs["youtube"]["url"] == "https://youtu.be/abc"
-    assert subidas == [("reel.mp4", "reel de prueba · Santo Rosario #Shorts")]   # una sola vez
+    assert subidas == [("reel.mp4", "reel de prueba · Evento en vivo #Shorts")]   # una sola vez
 
 
 def test_error_de_youtube_reintenta_y_luego_deja_plan_b(app, monkeypatch):
