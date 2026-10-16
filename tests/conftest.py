@@ -16,6 +16,7 @@ def app(tmp_path):
         "SQLALCHEMY_DATABASE_URI": "sqlite://",
         "SESSION_COOKIE_SECURE": False,
         "BCRYPT_ROUNDS": 4,
+        "TAILSCALE": False,  # no depender del .env real; la prueba que lo necesita lo activa
         "LOG_DIR": tmp_path / "logs",
         "FRONTEND_DIST": tmp_path / "sin-frontend",
         "PAQUETES_DIR": tmp_path / "paquetes",
