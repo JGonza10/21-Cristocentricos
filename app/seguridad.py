@@ -10,7 +10,7 @@ from sqlalchemy import func
 from .extensiones import db
 from .modelos import IntentoLogin, Usuario, ahora
 
-PATRON_USUARIO = re.compile(r"^[a-z0-9._-]{3,40}$")
+PATRON_USUARIO = re.compile(r"^[a-z0-9._@+-]{3,40}$")  # acepta correos (usuario dueño)
 PASSWORD_MIN = 10
 PASSWORD_MAX_BYTES = 72  # límite de bcrypt
 

@@ -105,3 +105,13 @@ def test_sin_tailscale_se_ignora_la_cabecera(app, cliente):
         cliente.post("/api/auth/login", json={"usuario": "otro", "password": "mala-password-1"},
                      headers={"X-CSRFToken": token(cliente), "Tailscale-User-Login": cuenta})
     assert login(cliente).status_code == 429  # cuenta por IP, la cabecera no sirve para evadir
+
+
+def test_correo_sirve_como_usuario(app, cliente):
+    from app.seguridad import hashear, normalizar_usuario
+    assert normalizar_usuario(" JuanGonza@Live.com.mx ") == "juangonza@live.com.mx"
+    assert normalizar_usuario("a b@x.com") is None
+    with app.app_context():
+        db.session.add(Usuario(usuario="juangonza@live.com.mx", nombre="Gonza", hash_password=hashear(PASSWORD)))
+        db.session.commit()
+    assert login(cliente, usuario="juangonza@live.com.mx").status_code == 200

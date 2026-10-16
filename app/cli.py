@@ -26,7 +26,7 @@ def registrar(app):
         maximo = current_app.config["MAX_USUARIOS"]
         if Usuario.query.count() >= maximo:
             raise click.ClickException(f"Ya existen {maximo} usuarios, que es el máximo permitido.")
-        usuario = normalizar_usuario(click.prompt("Usuario (minúsculas, sin espacios)"))
+        usuario = normalizar_usuario(click.prompt("Usuario o correo (minúsculas, sin espacios)"))
         if not usuario:
             raise click.ClickException("Usuario no válido: 3 a 40 caracteres, solo a-z, 0-9, punto, guion.")
         if Usuario.query.filter_by(usuario=usuario).first():
