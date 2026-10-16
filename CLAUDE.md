@@ -195,4 +195,4 @@ Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos compl
 | 6 | Acceso remoto | Aprobador en otra PC vía Tailscale (máquina compartida), sin abrir puertos |
 
 ## Palabra "evento" en vez de "rosario" (Gonza, 2026-10-16)
-Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js`, `proximoEvento`, `es_dia_de_evento`, `proximos_eventos`, `APOYOS_POR_EVENTO`; `APOYOS_POR_ROSARIO` sigue aceptándose como respaldo). Se quedan a propósito: los hashtags `#SantoRosario` / `#RosarioEnVivo` (búsqueda en redes), la pista de Whisper en `servicios/whisper.py` (reconoce las oraciones) y los nombres de los misterios. No reintroducir "rosario" en textos nuevos.
+Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js`, `proximoEvento`, `es_dia_de_evento`, `proximos_eventos`, `APOYOS_POR_EVENTO`). Se quedan a propósito: los hashtags `#SantoRosario` / `#RosarioEnVivo` (búsqueda en redes), la pista de Whisper en `servicios/whisper.py` (reconoce las oraciones) y los nombres de los misterios. No reintroducir "rosario" en textos nuevos.
