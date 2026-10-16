@@ -1,13 +1,22 @@
+# Actualizaciones automáticas. Las versiones mayores (ej. React 18 → 19) se ignoran
+# porque pueden romper el proyecto: esas se hacen a mano y probando.
+# Las alertas de SEGURIDAD llegan siempre, aunque sean de versión mayor.
 version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: "/frontend"
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
