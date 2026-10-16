@@ -21,11 +21,11 @@ nada se publica sin visto bueno humano.
 
 ## 2. Stack (confirmado 2026-10-16)
 - **Corre local en la PC de Gonza (Windows)**. Sin Railway por ahora.
-- **El aprobador entra desde otra computadora por Tailscale**: `tailscale serve --bg 5000` da HTTPS
+- **El aprobador entra desde otra computadora por Tailscale**: `tailscale serve --bg 5021` da HTTPS
   privado (`https://<pc>.<tailnet>.ts.net`). El servidor sigue en `127.0.0.1`; no se abren puertos.
   Con `TAILSCALE=1`, el bloqueo por origen usa la cabecera `Tailscale-User-Login`.
 - Backend: Python 3.12 + **Flask** como API JSON (`/api/...`), sesiones con cookie.
-- Frontend: **React + Vite** (`frontend/`). En desarrollo: Vite en :5173 con proxy a Flask :5000.
+- Frontend: **React + Vite** (`frontend/`). En desarrollo: Vite en :5173 con proxy a Flask :5021.
   En uso diario: `npm run build` y Flask sirve `frontend/dist`.
 - BD: **SQLite** (`datos/cristocentricos.db`, en .gitignore) con SQLAlchemy. Migrar a PostgreSQL solo si algún día se sube a la nube.
 - Video: **ffmpeg**. Transcripción: **faster-whisper** local (modelo `small`, español).
@@ -151,7 +151,7 @@ cd frontend; npm install; cd ..
 flask --app app crear-usuario      # Gonza y el aprobador
 
 # Desarrollo (3 ventanas)
-flask --app app run --debug        # API :5000
+flask --app app run --debug --port 5021   # API :5021
 cd frontend; npm run dev           # React :5173
 python -m agentes.worker           # agentes
 

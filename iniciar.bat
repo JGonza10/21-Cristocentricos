@@ -24,4 +24,4 @@ start "Cristocentricos - Servidor (no cerrar)" cmd /k ".venv\Scripts\python.exe 
 start "Cristocentricos - Agentes (no cerrar)" cmd /k ".venv\Scripts\python.exe -m agentes.worker"
 
 timeout /t 3 /nobreak >nul
-start "" http://localhost:5000
+start "" http://localhost:5021

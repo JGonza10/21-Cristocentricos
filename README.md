@@ -56,7 +56,7 @@ cd ..
 
 ## Uso diario
 Doble clic en `iniciar.bat`. Se abren **dos ventanas que no debes cerrar**:
-1. **Servidor**: la página en http://localhost:5000.
+1. **Servidor**: la página en http://localhost:5021.
 2. **Agentes**: preparan carruseles, reels, publicaciones y turnos según su horario.
 
 Si la ventana de agentes está cerrada, Inicio muestra «Agentes: Apagados».
@@ -80,7 +80,7 @@ internet y no se abren puertos en el módem. Funciona igual si están en la mism
 2. Deja en el `.env`: `HOST=127.0.0.1` y `TAILSCALE=1`.
 3. Con `iniciar.bat` corriendo, en PowerShell:
    ```powershell
-   tailscale serve --bg 5000
+   tailscale serve --bg 5021
    ```
    La primera vez te pedirá activar los certificados HTTPS en una página web; acepta.
    Te dará una dirección tipo `https://pc-gonza.algo.ts.net`.
@@ -96,7 +96,7 @@ internet y no se abren puertos en el módem. Funciona igual si están en la mism
 ## Desarrollo
 ```powershell
 # Ventana 1: API
-flask --app app run --debug
+flask --app app run --debug --port 5021
 # Ventana 2: interfaz con recarga automática
 cd frontend; npm run dev          # abre http://localhost:5173
 ```
@@ -138,7 +138,7 @@ días. En la pestaña **Evento** puedes cambiar a mano quién dirige y quién ap
 
 ## Reloj en vivo y overlay
 La pestaña **Evento** muestra la hora de la CDMX y la cuenta regresiva. El overlay para la
-transmisión está en `http://localhost:5000/reloj?tema=oscuro` (también `perla` y `chroma`):
+transmisión está en `http://localhost:5021/reloj?tema=oscuro` (también `perla` y `chroma`):
 - **OBS**: Fuentes → + → Navegador → pega la dirección, 1920×1080.
 - **StreamYard**: abre el overlay en una ventana y compártela; con `chroma` se puede quitar el verde.
 
@@ -183,7 +183,7 @@ mano se prepara sola.
 | `COOKIE_SECURE` | Cookie solo por conexión segura | `1` |
 | `SESION_HORAS` | Duración de la sesión | `8` |
 | `MAX_USUARIOS` | Máximo de cuentas | `2` |
-| `HOST` / `PORT` | Dónde escucha el servidor | `127.0.0.1` / `5000` |
+| `HOST` / `PORT` | Dónde escucha el servidor | `127.0.0.1` / `5021` |
 | `TAILSCALE` | El aprobador entra por `tailscale serve` | `1` |
 | `CANAL_NOMBRE` | Nombre en carruseles, reels y overlay | `Cristocéntricos` |
 | `CANAL_ENLACE` | Enlace del canal (opcional) en el carrusel | `youtube.com/@...` |
