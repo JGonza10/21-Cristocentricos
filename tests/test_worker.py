@@ -62,3 +62,24 @@ def test_estado_general(app, cliente):
     assert d["worker_activo"] is True
     reels = next(a for a in d["agentes"] if a["nombre"] == "reels")
     assert reels["mensaje"] == "1 reel nuevo en la bandeja" and reels["titulo"] == "Reels"
+
+
+def test_estado_trae_conteos_para_el_diagrama(app, cliente):
+    from datetime import date
+
+    from app.bandeja import crear_paquete
+    from app.modelos import Grabacion, Publicacion
+    login(cliente)
+    d = cliente.get("/api/estado").get_json()
+    assert d["pendientes_por_tipo"] == {} and d["grabaciones_conteo"] == {} and d["publicaciones_conteo"] == {}
+    with app.app_context():
+        crear_paquete("carrusel", date(2026, 10, 19), "Invitación")
+        reel = crear_paquete("reel", date(2026, 10, 19), "Reel 1")
+        crear_paquete("reel", date(2026, 10, 19), "Reel 2")
+        db.session.add(Grabacion(nombre="evento.mkv", estado="procesando"))
+        db.session.add(Publicacion(paquete_id=reel.id, red="youtube", estado="error"))
+        db.session.commit()
+    d = cliente.get("/api/estado").get_json()
+    assert d["pendientes_por_tipo"] == {"carrusel": 1, "reel": 2}
+    assert d["grabaciones_conteo"] == {"procesando": 1}
+    assert d["publicaciones_conteo"] == {"error": 1}

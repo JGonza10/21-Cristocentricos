@@ -1,9 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { agendaEditorial, fechaCorta, proximoEvento, semanaYSiguiente } from '../evento.js'
+import { proximoEvento } from '../evento.js'
 import { nombres } from '../util.js'
+import { calcularPasos, ESTADOS } from '../pasos.js'
+import Flujo from '../componentes/Flujo.jsx'
+import CalendarioEventos from '../componentes/CalendarioEventos.jsx'
+import '../styles/inicio.css'
 
-const ETIQUETA_ESTADO = { pasado: 'ya pasó', 'hoy-terminado': 'hoy, ya pasó', hoy: 'hoy', 'en-vivo': 'en vivo' }
+const REFRESCO_MS = 20_000
+const CLASE_ESTADO = { ok: 'ok', activo: 'activo', espera: 'warn', error: 'err', apagado: 'off' }
+
+// Botón de cada tarjeta: a dónde lleva resolver ese paso.
+const ACCION = {
+  turnos: { texto: 'Asignar en el calendario', destino: 'calendario' },
+  carrusel: { texto: 'Ver en la bandeja', destino: 'contenido' },
+  reels: { texto: 'Ver en la bandeja', destino: 'contenido' },
+  bandeja: { texto: 'Ir a la bandeja', destino: 'contenido' },
+  publicacion: { texto: 'Ver publicaciones', destino: 'contenido' },
+}
 
 function quienes(t) {
   if (!t || (!t.dirige && t.apoyan.length === 0)) return 'Sin asignar'
@@ -13,24 +27,42 @@ function quienes(t) {
   return partes.join(' · ')
 }
 
+function bajarA(id) {
+  const el = document.getElementById(id)
+  if (!el) return
+  const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'center' })
+  el.classList.remove('resaltar')
+  void el.offsetWidth // reinicia la animación si se pulsa dos veces
+  el.classList.add('resaltar')
+}
+
 export default function Inicio({ ir }) {
   const [ahora, setAhora] = useState(() => new Date())
   const [estado, setEstado] = useState(null)
   const [turnos, setTurnos] = useState({})
-  useEffect(() => {
+
+  const cargar = useCallback(() => {
     api('/api/estado').then(setEstado).catch(() => setEstado(null))
     api('/api/turnos').then((d) => setTurnos(d.turnos)).catch(() => setTurnos({}))
+    setAhora(new Date())
   }, [])
   useEffect(() => {
-    const t = setInterval(() => setAhora(new Date()), 60_000)
+    cargar()
+    const t = setInterval(cargar, REFRESCO_MS)
     return () => clearInterval(t)
-  }, [])
+  }, [cargar])
 
   const proximo = proximoEvento(ahora)
-  const semana = semanaYSiguiente(ahora)
-  const agenda = agendaEditorial(ahora)
   const tProximo = proximo && turnos[proximo.clave]
-  const pendientes = estado?.bandeja.pendiente
+  const pasos = calcularPasos(estado, turnos, ahora)
+  const trabajando = Boolean(estado?.worker_activo)
+
+  function accion(id) {
+    const a = ACCION[id]
+    if (a.destino === 'calendario') bajarA('calendario')
+    else ir(a.destino)
+  }
 
   return (
     <>
@@ -47,74 +79,43 @@ export default function Inicio({ ir }) {
           ) : (
             <p className="aviso">
               Todavía no se asigna quién dirige.{' '}
-              <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Asignar ahora</button>
+              <button className="enlace" onClick={() => bajarA('calendario')}>Asignar ahora</button>
             </p>
           )}
         </section>
       )}
 
-      <section className="tres">
-        <article className="tarjeta">
-          <span className="etiqueta">Bandeja</span>
-          <div className="numero">{pendientes ?? '–'}</div>
-          <p className="chico-texto" style={{ marginBottom: 12 }}>{pendientes === 1 ? 'paquete por revisar' : 'paquetes por revisar'}</p>
-          <button className="btn suave chico" onClick={() => ir('contenido')}>Ir a la bandeja</button>
-        </article>
-        <article className="tarjeta">
-          <span className="etiqueta">Agentes</span>
-          {estado?.worker_activo
-            ? <div className="estado ok">Trabajando</div>
-            : <div className="estado warn">Apagados</div>}
-          <p className="chico-texto">
-            {estado?.worker_activo
-              ? 'Vigilan las grabaciones, preparan el carrusel 2 días antes y reparten turnos los domingos a las 6 pm.'
-              : 'Abre iniciar.bat en la PC del sistema para que trabajen los agentes.'}
-          </p>
-        </article>
-        <article className="tarjeta">
-          <span className="etiqueta">Invitaciones</span>
-          {estado?.google
-            ? <div className="estado ok">Google Calendar conectado</div>
-            : <div className="estado warn">Google sin autorizar</div>}
-          <p className="chico-texto">
-            {estado?.google
-              ? 'Cada quien recibe en su calendario los eventos que le tocan.'
-              : <>Ve a <button className="enlace" onClick={() => ir('configuracion')}>Ajustes</button> para ver cómo conectarlo.</>}
-          </p>
-        </article>
-      </section>
-
       <section className="tarjeta">
-        <span className="etiqueta">Esta semana y la que sigue</span>
-        <ul className="lista">
-          {semana.map((r) => (
-            <li key={r.clave} className={`item ${r.estado === 'pasado' || r.estado === 'hoy-terminado' ? 'pasado' : ''} ${r.estado === 'hoy' || r.estado === 'en-vivo' ? 'hoy' : ''}`}>
-              <div>
-                <b>{r.nombre}{ETIQUETA_ESTADO[r.estado] && <span className={`pill ${r.estado.startsWith('hoy') || r.estado === 'en-vivo' ? '' : 'gris'}`}>{ETIQUETA_ESTADO[r.estado]}</span>}</b>
-                <span className="muted">{quienes(turnos[r.clave])} · {r.misterios.toLowerCase()}</span>
-              </div>
-              <button className="btn suave chico" onClick={() => ir('evento', r.clave)}>Ver</button>
-            </li>
-          ))}
-        </ul>
+        <div className="flujo-cabeza">
+          <span className="etiqueta">Así va el trabajo</span>
+          {estado && (trabajando
+            ? <span className="estado activo">Agentes trabajando</span>
+            : <span className="estado off">Agentes apagados · abre iniciar.bat</span>)}
+        </div>
+        <Flujo pasos={pasos} trabajando={trabajando} alElegir={(id) => bajarA(`paso-${id}`)} />
+        <div className="flujo-leyenda" aria-hidden="true">
+          {Object.entries(ESTADOS).map(([k, v]) => <span key={k} className={`ley ${k}`}><i />{v}</span>)}
+        </div>
       </section>
 
-      <section className="tarjeta agenda">
-        <span className="etiqueta">Agenda editorial</span>
-        {agenda.length === 0 ? <p className="vacio">Nada pendiente.</p> : (
-          <ul className="lista">
-            {agenda.map((a, i) => (
-              <li key={i} className="item">
-                <span className="cuando">{fechaCorta(a.fecha)}</span>
-                <div>
-                  <b>{a.tipo}<span className="pill gris">automático</span></b>
-                  <span className="muted">{a.texto}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+      <section className="pasos">
+        {pasos.map((p) => (
+          <article key={p.id} id={`paso-${p.id}`} className={`tarjeta paso ${p.estado}`}>
+            <span className="etiqueta">{p.numero} · {p.titulo}</span>
+            <div className={`estado ${CLASE_ESTADO[p.estado]}`}>{ESTADOS[p.estado]}</div>
+            <p className="paso-resumen">{p.resumen}</p>
+            {p.detalle.map((d) => <p key={d} className="chico-texto">{d}</p>)}
+            <p className="chico-texto paso-que">{p.que}</p>
+            {ACCION[p.id] && (
+              <div className="botones paso-accion">
+                <button className="btn suave chico" onClick={() => accion(p.id)}>{ACCION[p.id].texto}</button>
+              </div>
+            )}
+          </article>
+        ))}
       </section>
+
+      <CalendarioEventos ir={ir} alCambiar={cargar} />
     </>
   )
 }

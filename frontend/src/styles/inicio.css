@@ -1,0 +1,115 @@
+/* Inicio: diagrama del flujo, tarjetas por paso y calendario de eventos. */
+.estado.err{color:var(--err)}
+.estado.activo{color:var(--activo)}
+.estado.activo::before{animation:latido 1.4s ease-in-out infinite}
+@keyframes latido{50%{opacity:.3}}
+
+/* Diagrama */
+.flujo-cabeza{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+.flujo-cabeza .etiqueta{margin:0}
+.flujo-cabeza .estado{margin:0;font-size:.85rem}
+.flujo{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;gap:30px 28px;
+  grid-template-areas:"turnos grabacion reels bandeja publicacion" ". . carrusel bandeja publicacion"}
+.flujo-lineas{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.linea path{fill:none;stroke:var(--off);stroke-width:2;stroke-linecap:round;stroke-dasharray:2 7}
+.linea polygon{fill:var(--off)}
+.flujo.trabajando .linea path{stroke:var(--accent);opacity:.55;animation:fluir 1.6s linear infinite}
+.flujo.trabajando .linea polygon{fill:var(--accent);opacity:.55}
+.flujo.trabajando .linea.activa path{stroke:var(--activo);opacity:1;stroke-width:2.5;animation-duration:.6s}
+.flujo.trabajando .linea.activa polygon{fill:var(--activo);opacity:1}
+@keyframes fluir{to{stroke-dashoffset:-18}}
+.nodo{position:relative;z-index:1;display:grid;gap:3px;text-align:left;min-height:64px;padding:10px 12px;border-radius:var(--r-item);
+  background:var(--surface);border:1.5px solid var(--line);color:var(--ink);font:inherit;cursor:pointer;min-width:0}
+.nodo:hover{border-color:var(--accent)}
+.nodo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nodo-titulo{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nodo-num{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;font:700 .7rem var(--f-mono);
+  background:var(--accent-soft);color:var(--accent-strong)}
+.nodo-dato{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nodo.ok{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+.nodo.ok .nodo-dato{color:var(--ok)}
+.nodo.espera{border-color:var(--warn);background:var(--warn-soft)}
+.nodo.espera .nodo-dato{color:var(--warn);font-weight:700}
+.nodo.error{border-color:var(--err);background:var(--err-soft)}
+.nodo.error .nodo-dato{color:var(--err);font-weight:700}
+.nodo.apagado{border-style:dashed}
+.nodo.apagado .nodo-titulo{color:var(--muted)}
+.nodo.activo{border-color:var(--activo);background:var(--activo-soft)}
+.nodo.activo .nodo-dato{color:var(--activo);font-weight:700}
+.nodo.activo::after{content:"";position:absolute;inset:-5px;border-radius:calc(var(--r-item) + 4px);border:2px solid var(--activo);
+  opacity:0;animation:onda 1.8s ease-out infinite;pointer-events:none}
+@keyframes onda{0%{opacity:.7;transform:scale(.97)}100%{opacity:0;transform:scale(1.06)}}
+.flujo-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:18px;font-size:.78rem;color:var(--muted)}
+.ley{display:inline-flex;align-items:center;gap:6px}
+.ley i{width:10px;height:10px;border-radius:3px;border:1.5px solid var(--line);background:var(--surface)}
+.ley.ok i{border-color:var(--ok)}
+.ley.activo i{border-color:var(--activo);background:var(--activo-soft)}
+.ley.espera i{border-color:var(--warn);background:var(--warn-soft)}
+.ley.error i{border-color:var(--err);background:var(--err-soft)}
+.ley.apagado i{border-style:dashed}
+@media (max-width:760px){
+  .flujo{grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 22px;
+    grid-template-areas:"turnos carrusel" "grabacion carrusel" "reels ." "bandeja bandeja" "publicacion publicacion"}
+  .nodo.ancho{justify-self:center;width:min(100%,220px)}
+}
+
+/* Tarjetas por paso */
+.pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.paso{display:flex;flex-direction:column;scroll-margin:90px}
+.paso-resumen{margin:0 0 6px;color:var(--ink-2);font-weight:600}
+.paso .chico-texto + .chico-texto{margin-top:4px}
+.paso .paso-que{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.paso .paso-accion{margin-top:auto;padding-top:12px}
+.paso.espera{border-color:var(--warn)}
+.paso.error{border-color:var(--err)}
+.paso.activo{border-color:var(--activo)}
+.resaltar{animation:resaltar 1.4s ease-out}
+@keyframes resaltar{0%,40%{box-shadow:0 0 0 4px var(--accent-soft),0 0 0 6px var(--accent)}100%{box-shadow:var(--shadow)}}
+
+/* Calendario */
+.cal-cabeza{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+.cal-cabeza .etiqueta{margin:0}
+.cal-nav{display:flex;align-items:center;gap:8px}
+.cal-mes{min-width:9.5em;text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal-dia-nombre{font:700 .7rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:2px}
+.cal-celda{min-height:62px;padding:6px 7px;border-radius:10px;background:var(--surface-2);border:1px solid transparent;
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;font:inherit;color:var(--muted-2);min-width:0}
+.cal-celda.fuera{opacity:.45}
+.cal-celda.hoy .cal-num{background:var(--accent);color:var(--on-accent);border-radius:99px;padding:0 6px}
+.cal-num{font:600 .8rem var(--f-mono)}
+.cal-celda.evento{cursor:pointer;color:var(--ink);border-color:var(--line);background:var(--surface)}
+.cal-celda.evento:hover{border-color:var(--accent)}
+.cal-celda.evento:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cal-celda.evento[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.cal-quien{font-size:.74rem;font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-celda.asignado{border-left:4px solid var(--ok)}
+.cal-celda.asignado .cal-quien{color:var(--ok)}
+.cal-celda.hueco{border-left:4px solid var(--warn);background:var(--warn-soft)}
+.cal-celda.hueco .cal-quien{color:var(--warn)}
+.cal-celda.pasado{border-left:4px solid var(--off)}
+.cal-celda.pasado .cal-quien{color:var(--muted)}
+.cal-pie{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:14px 0 6px;font-size:.8rem;color:var(--muted)}
+.cal-pie .btn{margin-left:auto}
+.cal-leyenda{display:inline-flex;align-items:center;gap:6px}
+.cal-leyenda i{width:4px;height:14px;border-radius:2px}
+.cal-leyenda i.asignado{background:var(--ok)}
+.cal-leyenda i.hueco{background:var(--warn)}
+.cal-leyenda i.pasado{background:var(--off)}
+.cal-detalle{margin-top:14px;padding-top:16px;border-top:1px solid var(--line)}
+.cal-detalle h3{margin-bottom:10px}
+.cal-detalle .tarjeta{border:0;padding:0;box-shadow:none;background:none}
+@media (max-width:560px){
+  .cal{gap:4px}
+  .cal-celda{min-height:48px;padding:5px 4px;align-items:center}
+  .cal-quien{display:none}
+  .cal-celda.evento::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--off)}
+  .cal-celda.asignado::after{background:var(--ok)}
+  .cal-celda.hueco::after{background:var(--warn)}
+  .cal-celda.asignado,.cal-celda.hueco,.cal-celda.pasado{border-left-width:1px}
+  .cal-pie .btn{margin-left:0;flex:1 1 100%}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .flujo.trabajando .linea path,.nodo.activo::after,.estado.activo::before,.resaltar{animation:none}
+}

@@ -196,3 +196,10 @@ Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos compl
 
 ## Palabra "evento" en vez de "rosario" (Gonza, 2026-10-16)
 Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js`, `proximoEvento`, `es_dia_de_evento`, `proximos_eventos`, `APOYOS_POR_EVENTO`). Se quedan a propósito: los hashtags `#SantoRosario` / `#RosarioEnVivo` (búsqueda en redes), la pista de Whisper en `servicios/whisper.py` (reconoce las oraciones) y los nombres de los misterios. No reintroducir "rosario" en textos nuevos.
+
+## Inicio: diagrama, tarjetas por paso y calendario (Gonza, 2026-10-16)
+- **Diagrama animado** (`frontend/src/componentes/Flujo.jsx`): Turnos → Grabación → Reels → Bandeja → Publicación, y Carrusel → Bandeja. Cajas en cuadrícula (2 columnas en celular) y flechas SVG medidas sobre las cajas; se animan si el worker está vivo, más rápido en los pasos que trabajan.
+- **Estado de cada paso** en `frontend/src/pasos.js` (`calcularPasos`): ok / activo / espera (te necesita) / error / apagado, a partir de `/api/estado` (incluye `pendientes_por_tipo`, `grabaciones_conteo`, `publicaciones_conteo`) y `/api/turnos`. Inicio refresca cada 20 s.
+- **Una tarjeta por paso**, mismo orden y número que el diagrama; clic en una caja baja a su tarjeta.
+- **Calendario del mes** (`CalendarioEventos.jsx`): lunes y viernes con quién dirige; al elegir un día se asignan turnos ahí (reusa `componentes/Turnos.jsx`, el mismo de la pestaña Evento) y hay botón para llenar huecos (`POST /api/turnos/repartir`).
+- Estilos en `styles/inicio.css`; tokens nuevos `--err`, `--activo` (y sus `-soft`) en claro y oscuro.

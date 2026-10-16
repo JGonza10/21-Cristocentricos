@@ -2,9 +2,11 @@
 from datetime import timedelta
 
 from flask import Blueprint, current_app, jsonify
+from sqlalchemy import func
 
 from .bandeja import conteos
-from .modelos import EstadoAgente, Grabacion, ahora
+from .extensiones import db
+from .modelos import EstadoAgente, Grabacion, Paquete, Publicacion, ahora
 from .seguridad import login_requerido
 
 bp = Blueprint("panel", __name__, url_prefix="/api")
@@ -19,6 +21,12 @@ AGENTES = {
 LATIDO_MAX = timedelta(minutes=3)
 
 
+def _contar(columna, *filtros) -> dict:
+    """{valor: cantidad} agrupando por una columna (para el diagrama de Inicio)."""
+    consulta = db.session.query(columna, func.count()).filter(*filtros).group_by(columna)
+    return {valor: n for valor, n in consulta.all()}
+
+
 @bp.get("/estado")
 @login_requerido
 def estado():
@@ -29,6 +37,9 @@ def estado():
     grabaciones = Grabacion.query.order_by(Grabacion.id.desc()).limit(5).all()
     return jsonify(
         bandeja=conteos(),
+        pendientes_por_tipo=_contar(Paquete.tipo, Paquete.estado == "pendiente"),
+        grabaciones_conteo=_contar(Grabacion.estado),
+        publicaciones_conteo=_contar(Publicacion.estado),
         worker_activo=activo,
         agentes=[{**(registros[n].a_dict() if n in registros else {"nombre": n}), "titulo": t}
                  for n, t in AGENTES.items() if n != "worker"],
