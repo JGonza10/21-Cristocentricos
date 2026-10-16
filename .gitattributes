@@ -1,0 +1,6 @@
+# Git normaliza los finales de línea; los .bat siempre con CRLF para Windows.
+* text=auto
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ttf binary

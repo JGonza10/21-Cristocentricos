@@ -1,0 +1,27 @@
+# Secretos
+.env
+secretos/
+client_secret*.json
+token*.json
+
+# Datos reales (base de datos, logs, videos, paquetes)
+datos/
+*.db
+*.sqlite3
+*.log
+grabaciones/
+paquetes/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Sistema
+Thumbs.db
+.DS_Store
