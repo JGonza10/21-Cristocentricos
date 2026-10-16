@@ -35,7 +35,15 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - name: Instalar dependencias
+        shell: bash
+        run: |
+          set -o pipefail
+          node -v; npm -v
+          if ! npm ci 2>&1 | tee npm-ci.log; then
+            echo "::error title=npm ci::$(grep -E 'npm (ERR|error)' npm-ci.log | head -8 | tr '\n' ' ')"
+            exit 1
+          fi
       - name: Dependencias vulnerables (npm audit)
         run: npm audit --audit-level=high
       - name: Compilar
