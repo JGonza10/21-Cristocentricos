@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { nombreFecha } from '../rosario.js'
+import { REDES, fechaDeClave, fechaHora, segundosATexto } from '../util.js'
 
 const FILTROS = [
   { id: 'pendiente', nombre: 'Pendientes' },
@@ -8,38 +9,42 @@ const FILTROS = [
   { id: 'rechazado', nombre: 'Rechazados' },
 ]
 const VACIO = {
-  pendiente: 'No hay paquetes por revisar. Aquí aparecerán los carruseles y reels que preparen los agentes.',
+  pendiente: 'No hay paquetes por revisar. Aquí aparecen los carruseles (2 días antes de cada rosario) y los reels (cuando llega la grabación).',
   aprobado: 'Todavía no apruebas ningún paquete.',
   rechazado: 'No hay paquetes rechazados.',
 }
 const TEXTO_MAX = 2200
-
-const PASOS = [
-  { fase: 3, titulo: 'Carruseles', texto: '5 imágenes blanco y vino por rosario, listas 2 días antes.' },
-  { fase: 4, titulo: 'Reels', texto: '3 videos verticales con subtítulos de cada transmisión.' },
-  { fase: 5, titulo: 'Publicación', texto: 'Carpeta por red social y subida directa a YouTube.' },
-]
-
-const fechaEvento = (iso) => nombreFecha(new Date(`${iso}T00:00:00Z`))
-const fechaHora = (iso) => new Date(iso).toLocaleString('es-MX', {
-  timeZone: 'America/Mexico_City', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
-})
+const REDES_POR_TIPO = { carrusel: ['instagram', 'facebook', 'tiktok'], reel: ['instagram', 'facebook', 'tiktok', 'youtube'] }
+const ESTADO_PUB = {
+  listo_manual: { texto: 'Listo para subir', clase: 'warn' },
+  subiendo: { texto: 'Subiendo…', clase: 'off' },
+  publicado: { texto: 'Publicado', clase: 'ok' },
+  error: { texto: 'Con error', clase: 'warn' },
+}
+const ESTADO_GRAB = { nueva: 'En espera', procesando: 'Procesando…', lista: 'Reels listos', error: 'Con error' }
+const REFRESCO_MS = 30_000
 
 export default function Contenido() {
   const [filtro, setFiltro] = useState('pendiente')
   const [paquetes, setPaquetes] = useState(null)
   const [conteos, setConteos] = useState({ pendiente: 0, aprobado: 0, rechazado: 0 })
+  const [grabaciones, setGrabaciones] = useState([])
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let vigente = true
-    setPaquetes(null)
-    setError('')
-    api(`/api/bandeja?estado=${filtro}`)
-      .then((d) => { if (vigente) { setPaquetes(d.paquetes); setConteos(d.conteos) } })
-      .catch((e) => { if (vigente) { setError(e.message); setPaquetes([]) } })
-    return () => { vigente = false }
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) { setPaquetes(null); setError('') }
+    return api(`/api/bandeja?estado=${filtro}`)
+      .then((d) => { setPaquetes(d.paquetes); setConteos(d.conteos) })
+      .catch((e) => { if (!silencioso) { setError(e.message); setPaquetes([]) } })
   }, [filtro])
+
+  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => {
+    // Los agentes trabajan en segundo plano: se refresca solo cada 30 s.
+    const t = setInterval(() => { if (!document.hidden) cargar(true) }, REFRESCO_MS)
+    return () => clearInterval(t)
+  }, [cargar])
+  useEffect(() => { api('/api/estado').then((d) => setGrabaciones(d.grabaciones)).catch(() => {}) }, [])
 
   function actualizar(nuevo, nuevosConteos) {
     setPaquetes((lista) => (nuevo.estado === filtro
@@ -69,16 +74,22 @@ export default function Contenido() {
       {paquetes?.length === 0 && !error && <section className="tarjeta"><p className="vacio">{VACIO[filtro]}</p></section>}
       {paquetes?.map((p) => <TarjetaPaquete key={p.id} paquete={p} alCambiar={actualizar} />)}
 
-      <section className="tarjeta">
-        <span className="etiqueta">Lo que viene en esta sección</span>
-        <ul className="lista">
-          {PASOS.map((p) => (
-            <li key={p.fase} className="item">
-              <div><b>{p.titulo}<span className="pill">fase {p.fase}</span></b><span className="muted">{p.texto}</span></div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {grabaciones.length > 0 && (
+        <section className="tarjeta">
+          <span className="etiqueta">Grabaciones recientes</span>
+          <ul className="lista">
+            {grabaciones.map((g) => (
+              <li key={g.id} className="item">
+                <div>
+                  <b className="partir">{g.nombre}</b>
+                  <span className="muted">{g.error || (g.duracion ? `Duración ${segundosATexto(g.duracion)}` : 'Esperando a que termine de copiarse')}</span>
+                </div>
+                <span className={`pill ${g.estado === 'lista' ? 'verde' : g.estado === 'error' ? 'ambar' : 'gris'}`}>{ESTADO_GRAB[g.estado]}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   )
 }
@@ -95,10 +106,21 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
   // Si llega una versión nueva del servidor (p. ej. la cambió el otro aprobador), se muestra esa.
   useEffect(() => { setTexto(p.texto) }, [p.texto, p.version])
 
-  async function hacer(accion) {
+  async function llamar(fn) {
     setOcupado(true)
     setError('')
     try {
+      await fn()
+    } catch (e) {
+      setError(e.message)
+      if (e.status === 409) recargar()
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  function hacer(accion) {
+    return llamar(async () => {
       let actual = p
       if (accion !== 'reabrir' && modificado) {
         actual = (await api(`/api/bandeja/${p.id}`, { metodo: 'PATCH', datos: { version: p.version, texto } })).paquete
@@ -109,12 +131,7 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
         metodo: 'POST', datos: { version: actual.version, ...(accion === 'rechazar' ? { motivo } : {}) },
       })
       alCambiar(d.paquete, d.conteos)
-    } catch (e) {
-      setError(e.message)
-      if (e.status === 409) recargar()
-    } finally {
-      setOcupado(false)
-    }
+    })
   }
 
   async function recargar() {
@@ -128,19 +145,23 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
     <article className="tarjeta paquete" aria-labelledby={`paq-${p.id}`}>
       <div className="paq-cabeza">
         <span className="pill">{p.tipo}</span>
-        <span className="muted chico-texto">Rosario del {fechaEvento(p.fecha_evento).toLowerCase()}</span>
+        <span className="muted chico-texto">Rosario del {nombreFecha(fechaDeClave(p.fecha_evento)).toLowerCase()}</span>
       </div>
       <h3 id={`paq-${p.id}`}>{p.titulo}</h3>
 
       {p.archivos.length > 0 && (
         <div className="previas">
           {p.archivos.map((a) => {
-            const src = `/api/bandeja/${p.id}/archivo/${encodeURIComponent(a)}`
+            const src = `/api/bandeja/${p.id}/archivo/${encodeURIComponent(a)}?v=${p.version}`
             return a.toLowerCase().endsWith('.mp4')
-              ? <video key={a} src={src} controls preload="metadata" playsInline />
-              : <a key={a} href={src} target="_blank" rel="noreferrer"><img src={src} alt={`Vista previa ${a}`} loading="lazy" /></a>
+              ? <video key={`${a}-${p.version}`} src={src} controls preload="metadata" playsInline />
+              : <a key={a} href={src} target="_blank" rel="noreferrer"><img src={src} alt={`Imagen ${a.replace('.png', '')} del carrusel`} loading="lazy" /></a>
           })}
         </div>
+      )}
+
+      {pendiente && p.tipo === 'reel' && p.datos.grabacion_id && (
+        <Recorte paquete={p} ocupado={ocupado} llamar={llamar} alCambiar={alCambiar} />
       )}
 
       {pendiente ? (
@@ -160,6 +181,8 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
         </>
       )}
 
+      {p.estado === 'aprobado' && <Publicaciones paquete={p} ocupado={ocupado} llamar={llamar} alCambiar={alCambiar} />}
+
       {pendiente && rechazando && (
         <div className="campo">
           <label htmlFor={`mot-${p.id}`}>¿Por qué lo rechazas? (opcional)</label>
@@ -172,7 +195,7 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
 
       <div className="botones">
         {pendiente && !rechazando && <>
-          <button className="btn" disabled={ocupado} onClick={() => hacer('aprobar')}>
+          <button className="btn" disabled={ocupado || !!p.datos.recortar} onClick={() => hacer('aprobar')}>
             {modificado ? 'Guardar y aprobar' : 'Aprobar'}
           </button>
           {modificado && <button className="btn suave" disabled={ocupado} onClick={() => hacer('guardar')}>Guardar texto</button>}
@@ -182,8 +205,98 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
           <button className="btn" disabled={ocupado} onClick={() => hacer('rechazar')}>Confirmar rechazo</button>
           <button className="btn suave" disabled={ocupado} onClick={() => { setRechazando(false); setMotivo('') }}>Cancelar</button>
         </>}
-        {!pendiente && <button className="btn suave" disabled={ocupado} onClick={() => hacer('reabrir')}>Regresar a pendientes</button>}
+        {!pendiente && !p.publicaciones.some((x) => x.estado === 'publicado' || x.estado === 'subiendo') &&
+          <button className="btn suave" disabled={ocupado} onClick={() => hacer('reabrir')}>Regresar a pendientes</button>}
       </div>
     </article>
+  )
+}
+
+function Recorte({ paquete: p, ocupado, llamar, alCambiar }) {
+  const [abierto, setAbierto] = useState(false)
+  const [inicio, setInicio] = useState(String(p.datos.inicio))
+  const [fin, setFin] = useState(String(p.datos.fin))
+  const pidio = p.datos.recortar
+  const duracion = Number(fin) - Number(inicio)
+
+  function regenerar() {
+    return llamar(async () => {
+      const d = await api(`/api/bandeja/${p.id}/recortar`, {
+        metodo: 'POST', datos: { version: p.version, inicio: Number(inicio), fin: Number(fin) },
+      })
+      alCambiar(d.paquete)
+      setAbierto(false)
+    })
+  }
+
+  return (
+    <div className="recorte">
+      <p className="chico-texto">
+        Tomado de la grabación: del {segundosATexto(p.datos.inicio)} al {segundosATexto(p.datos.fin)}
+        {' '}({Math.round(p.datos.fin - p.datos.inicio)} s).{' '}
+        {!pidio && !abierto && <button className="enlace" onClick={() => setAbierto(true)}>Ajustar recorte</button>}
+      </p>
+      {pidio && <div className="estado off">Regenerando el video ({segundosATexto(pidio.inicio)} a {segundosATexto(pidio.fin)})… tarda 1 a 2 minutos.</div>}
+      {p.datos.error_recorte && <p className="error">{p.datos.error_recorte}</p>}
+      {abierto && !pidio && (
+        <div className="recorte-campos">
+          <div className="campo">
+            <label htmlFor={`ini-${p.id}`}>Inicio (segundos)</label>
+            <input id={`ini-${p.id}`} type="number" inputMode="decimal" step="0.5" min="0" value={inicio}
+              onChange={(e) => setInicio(e.target.value)} />
+          </div>
+          <div className="campo">
+            <label htmlFor={`fin-${p.id}`}>Fin (segundos)</label>
+            <input id={`fin-${p.id}`} type="number" inputMode="decimal" step="0.5" min="0" value={fin}
+              onChange={(e) => setFin(e.target.value)} />
+          </div>
+          <p className="chico-texto">Duración: {Number.isFinite(duracion) ? Math.round(duracion) : '–'} s (de 5 a 59 s).</p>
+          <div className="botones">
+            <button className="btn" disabled={ocupado} onClick={regenerar}>Regenerar video</button>
+            <button className="btn suave" disabled={ocupado} onClick={() => setAbierto(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Publicaciones({ paquete: p, ocupado, llamar, alCambiar }) {
+  const porRed = Object.fromEntries(p.publicaciones.map((x) => [x.red, x]))
+  const redes = REDES_POR_TIPO[p.tipo]
+
+  function marcar(red, accion) {
+    return llamar(async () => {
+      const d = await api(`/api/bandeja/${p.id}/publicaciones/${red}`, { metodo: 'POST', datos: { accion } })
+      alCambiar(d.paquete)
+    })
+  }
+
+  return (
+    <div>
+      <span className="etiqueta">Publicación</span>
+      {p.publicaciones.length === 0 && (
+        <p className="chico-texto" style={{ marginTop: 6 }}>El agente de publicación lo prepara en unos minutos (la ventana de agentes debe estar abierta).</p>
+      )}
+      <ul className="lista" style={{ marginTop: 8 }}>
+        {redes.filter((r) => porRed[r]).map((red) => {
+          const pub = porRed[red]
+          const e = ESTADO_PUB[pub.estado]
+          return (
+            <li key={red} className="item pub">
+              <div>
+                <b>{REDES[red]}</b>
+                <span className={`estado ${e.clase}`}>{e.texto}</span>
+                {pub.error && <span className="muted">{pub.error}</span>}
+                {pub.estado === 'listo_manual' && pub.ruta && <code className="ruta">paquetes/{pub.ruta}</code>}
+              </div>
+              {pub.estado === 'listo_manual' && <button className="btn suave chico" disabled={ocupado} onClick={() => marcar(red, 'subido')}>Ya lo subí</button>}
+              {pub.estado === 'error' && <button className="btn suave chico" disabled={ocupado} onClick={() => marcar(red, 'reintentar')}>Reintentar</button>}
+              {pub.estado === 'publicado' && pub.url && <a className="btn suave chico" href={pub.url} target="_blank" rel="noreferrer">Ver</a>}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

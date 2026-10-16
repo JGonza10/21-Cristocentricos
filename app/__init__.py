@@ -8,7 +8,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
-from . import auth, bandeja, cli, errores
+from . import auth, bandeja, cli, equipo, errores, panel
+from .migracion import migrar
 from .extensiones import csrf, db
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -45,6 +46,19 @@ def create_app(config: dict | None = None) -> Flask:
         LOGIN_VENTANA_MIN=15,
         FRONTEND_DIST=RAIZ / "frontend" / "dist",
         PAQUETES_DIR=RAIZ / "paquetes",
+        GRABACIONES_DIR=RAIZ / "grabaciones",
+        SECRETOS_DIR=RAIZ / "secretos",
+        FUENTES_DIR=RAIZ / "assets" / "fuentes",
+        CANAL_NOMBRE=os.environ.get("CANAL_NOMBRE", "Cristocéntricos"),
+        CANAL_ENLACE=os.environ.get("CANAL_ENLACE", ""),
+        WHISPER_MODELO=os.environ.get("WHISPER_MODELO", "small"),
+        APOYOS_POR_ROSARIO=int(os.environ.get("APOYOS_POR_ROSARIO", "1")),
+        GOOGLE_CALENDAR_ID=os.environ.get("GOOGLE_CALENDAR_ID", "primary"),
+        META_AUTO=os.environ.get("META_AUTO", "0") == "1",
+        META_PAGE_ID=os.environ.get("META_PAGE_ID", ""),
+        META_IG_USER_ID=os.environ.get("META_IG_USER_ID", ""),
+        META_TOKEN=os.environ.get("META_TOKEN", ""),
+        META_GRAPH_VERSION=os.environ.get("META_GRAPH_VERSION", "v23.0"),
         LOG_DIR=RAIZ / "datos" / "logs",
     )
     if config:
@@ -57,6 +71,8 @@ def create_app(config: dict | None = None) -> Flask:
     csrf.init_app(app)
     app.register_blueprint(auth.bp)
     app.register_blueprint(bandeja.bp)
+    app.register_blueprint(equipo.bp)
+    app.register_blueprint(panel.bp)
     errores.registrar(app)
     cli.registrar(app)
     _registrar_frontend(app)
@@ -72,6 +88,8 @@ def create_app(config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        for columna in migrar():
+            app.logger.info("Migración: se agregó la columna %s", columna)
     return app
 
 
@@ -96,6 +114,8 @@ def _registrar_frontend(app: Flask) -> None:
         dist = Path(app.config["FRONTEND_DIST"])
         if not (dist / "index.html").exists():
             return jsonify(error="La interfaz no está compilada. Ejecuta: cd frontend; npm run build"), 503
+        if ruta == "reloj" and (dist / "reloj.html").is_file():
+            return send_from_directory(dist, "reloj.html")  # overlay público, sin datos
         if ruta and (dist / ruta).is_file():
             return send_from_directory(dist, ruta)
         return send_from_directory(dist, "index.html")

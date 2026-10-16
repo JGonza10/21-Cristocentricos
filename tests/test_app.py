@@ -36,11 +36,13 @@ def test_sirve_frontend_compilado(tmp_path):
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / "index.html").write_text("<h1>hola</h1>", encoding="utf-8")
+    (dist / "reloj.html").write_text("<h1>reloj</h1>", encoding="utf-8")
     app = create_app({"TESTING": True, "SECRET_KEY": "x", "SQLALCHEMY_DATABASE_URI": "sqlite://",
                       "FRONTEND_DIST": dist, "LOG_DIR": tmp_path / "logs"})
     c = app.test_client()
     assert "hola" in c.get("/").get_data(as_text=True)
     assert "hola" in c.get("/bandeja").get_data(as_text=True)  # rutas de React
+    assert "reloj" in c.get("/reloj?tema=chroma").get_data(as_text=True)  # overlay sin sesión
 
 
 def test_sin_secret_key_no_arranca(monkeypatch):

@@ -6,6 +6,7 @@ Reglas:
 - El agente de publicación (fase 5) solo toma lo que está "aprobado".
 - Si se edita algo, primero debe estar pendiente: lo aprobado no cambia a escondidas.
 """
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from flask import Blueprint, abort, current_app, g, jsonify, request, send_from_
 from sqlalchemy import func
 
 from .extensiones import db
-from .modelos import ESTADOS_PAQUETE, TIPOS_PAQUETE, HistorialPaquete, Paquete, ahora
+from .modelos import ESTADOS_PAQUETE, REDES, TIPOS_PAQUETE, HistorialPaquete, Paquete, Publicacion, ahora
 from .seguridad import login_requerido
 
 bp = Blueprint("bandeja", __name__, url_prefix="/api/bandeja")
@@ -55,7 +56,8 @@ def _nombre_archivo_valido(nombre) -> bool:
 
 
 def crear_paquete(tipo: str, fecha_evento: date, titulo: str, texto: str = "",
-                  carpeta: str = "", archivos: list[str] | None = None) -> Paquete:
+                  carpeta: str = "", archivos: list[str] | None = None,
+                  datos: dict | None = None) -> Paquete:
     """Mete un paquete nuevo a la bandeja como pendiente. Lo usan los agentes (fases 3 y 4)."""
     if tipo not in TIPOS_PAQUETE:
         raise ErrorBandeja("Tipo de paquete no válido.")
@@ -70,11 +72,21 @@ def crear_paquete(tipo: str, fecha_evento: date, titulo: str, texto: str = "",
 
     p = Paquete(tipo=tipo, fecha_evento=fecha_evento,
                 titulo=_limpiar_texto(titulo, "título", TITULO_MAX, obligatorio=True),
-                texto=_limpiar_texto(texto, "texto", TEXTO_MAX), carpeta=carpeta, archivos=archivos)
+                texto=_limpiar_texto(texto, "texto", TEXTO_MAX), carpeta=carpeta, archivos=archivos,
+                datos=datos or None)
     p.historial.append(HistorialPaquete(accion="creado"))
     db.session.add(p)
     db.session.commit()
     return p
+
+
+def actualizar_por_agente(pid: int, cambios: dict, accion: str, detalle: str | None = None) -> None:
+    """Cambio hecho por un agente (no por una persona): sube la versión y deja historial."""
+    cambios = {**cambios, "version": Paquete.version + 1, "actualizado": ahora()}
+    Paquete.query.filter(Paquete.id == pid).update(cambios, synchronize_session=False)
+    db.session.add(HistorialPaquete(paquete_id=pid, accion=accion, detalle=(detalle or "")[:300] or None))
+    db.session.commit()
+    db.session.expire_all()
 
 
 def paquetes_aprobados() -> list[Paquete]:
@@ -203,12 +215,78 @@ def rechazar(pid: int):
 @bp.post("/<int:pid>/reabrir")
 @login_requerido
 def reabrir(pid: int):
-    """Regresa un paquete aprobado o rechazado a pendientes (para corregirlo o pensarlo otra vez)."""
+    """Regresa un paquete aprobado o rechazado a pendientes (para corregirlo o pensarlo otra vez).
+
+    No se puede si ya se publicó (o se está subiendo) en alguna red. Las carpetas de
+    subir_manual que ya se habían preparado se borran: al aprobarlo otra vez se hacen de nuevo.
+    """
     datos = _datos()
+    actual = db.session.get(Paquete, pid) or abort(404)
+    if any(x.estado in ("publicado", "subiendo") for x in actual.publicaciones):
+        raise ErrorBandeja("Este paquete ya se publicó en alguna red; ya no se puede regresar a pendientes.", 409)
     p = _cambiar(pid, datos.get("version"), ("aprobado", "rechazado"),
                  {"estado": "pendiente", "motivo_rechazo": None,
                   "revisado_por_id": None, "revisado_en": None}, "reabierto")
+    _borrar_publicaciones(p)
     return jsonify(paquete=p.a_dict(), conteos=conteos())
+
+
+def _borrar_publicaciones(p: Paquete) -> None:
+    raiz = Path(current_app.config["PAQUETES_DIR"]).resolve()
+    for pub in list(p.publicaciones):
+        if pub.ruta:
+            carpeta = (raiz / pub.ruta).resolve()
+            if raiz in carpeta.parents:
+                shutil.rmtree(carpeta, ignore_errors=True)
+        db.session.delete(pub)
+    db.session.commit()
+    db.session.refresh(p)
+
+
+@bp.post("/<int:pid>/recortar")
+@login_requerido
+def recortar(pid: int):
+    """Ajuste manual de inicio/fin de un reel (CLAUDE.md §2.1.7). El worker regenera el video."""
+    datos = _datos()
+    actual = db.session.get(Paquete, pid) or abort(404)
+    if actual.tipo != "reel" or not (actual.datos or {}).get("grabacion_id"):
+        raise ErrorBandeja("Solo los reels se pueden recortar.")
+    inicio, fin = datos.get("inicio"), datos.get("fin")
+    if not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in (inicio, fin)):
+        raise ErrorBandeja("Escribe el inicio y el fin en segundos.")
+    from agentes.reels import RECORTE_MAX, RECORTE_MIN  # import local: evita ciclo app <-> agentes
+    total = float((actual.datos or {}).get("duracion_fuente") or 0)
+    if inicio < 0 or fin > total or not RECORTE_MIN <= fin - inicio <= RECORTE_MAX:
+        raise ErrorBandeja(f"El reel debe durar entre {RECORTE_MIN:.0f} y {RECORTE_MAX:.0f} segundos "
+                           f"y quedar dentro de la grabación (0 a {total:.0f} s).")
+    nuevos = {**(actual.datos or {}), "recortar": {"inicio": round(inicio, 2), "fin": round(fin, 2)}}
+    nuevos.pop("error_recorte", None)
+    p = _cambiar(pid, datos.get("version"), ("pendiente",), {"datos": nuevos}, "editado",
+                 f"Recorte pedido: {inicio:.1f} s a {fin:.1f} s")
+    return jsonify(paquete=p.a_dict())
+
+
+@bp.post("/<int:pid>/publicaciones/<red>")
+@login_requerido
+def publicacion(pid: int, red: str):
+    """Marca como subido a mano lo que estaba listo en subir_manual/, o reintenta un error."""
+    if red not in REDES:
+        abort(404)
+    accion = _datos().get("accion")
+    pub = Publicacion.query.filter_by(paquete_id=pid, red=red).first() or abort(404)
+    if pub.paquete.estado != "aprobado":
+        raise ErrorBandeja("Solo se publica lo aprobado.", 409)
+    if accion == "subido" and pub.estado == "listo_manual":
+        pub.estado = "publicado"
+    elif accion == "reintentar" and pub.estado == "error":
+        pub.estado, pub.intentos, pub.error = "error", 0, None   # el agente lo vuelve a intentar
+    else:
+        raise ErrorBandeja("Esa acción no aplica en este momento.", 409)
+    pub.actualizado = ahora()
+    db.session.add(HistorialPaquete(paquete_id=pid, usuario_id=g.usuario.id, accion=f"{red}:{accion}"[:20]))
+    db.session.commit()
+    current_app.logger.info("Paquete %s: %s %s por %s", pid, red, accion, g.usuario.usuario)
+    return jsonify(paquete=db.session.get(Paquete, pid).a_dict())
 
 
 @bp.get("/<int:pid>/archivo/<nombre>")

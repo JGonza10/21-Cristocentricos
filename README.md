@@ -3,12 +3,24 @@
 Convierte cada Santo Rosario en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
 invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
 
-**Estado:** fase 2 (bandeja de aprobación). Ver `CLAUDE.md` para el plan completo.
+**Estado:** las 8 fases del plan están programadas y probadas (ver `CLAUDE.md`). Falta conectarlas
+con tus cuentas reales: Google (YouTube y Calendar) y, si quieres, Meta.
+
+| Qué hace | Cuándo |
+|---|---|
+| Carrusel de invitación (5 imágenes + texto) | Solo, 2 días antes de cada lunes y viernes |
+| 3 reels verticales con subtítulos | Solo, cuando llega la grabación a `grabaciones/` |
+| Bandeja: aprobar, rechazar, editar texto, ajustar recorte | Cuando tú o el aprobador entran |
+| Carpetas `subir_manual/<red>/` y subida a YouTube (privado) | Solo, en cuanto algo se aprueba |
+| Reparto de turnos e invitaciones de Google Calendar | Domingos 6 pm (y botón «Repartir ahora») |
+| Reloj CDMX con cuenta regresiva y overlay para transmitir | Pestaña Evento y `/reloj` |
+| Facebook e Instagram automáticos (opcional) | Si activas `META_AUTO=1` |
 
 ## Requisitos (Windows)
 - Python 3.12 o superior
 - Node.js 20 o superior
-- ffmpeg (para las fases de video): `winget install Gyan.FFmpeg`
+- ffmpeg (para los reels): `winget install Gyan.FFmpeg`
+- ~2 GB libres: la primera vez, Whisper descarga su modelo `small` (~500 MB)
 
 ## Repositorio
 https://github.com/JGonza10/21-Cristocentricos (público: nunca subir `.env`, la base de datos ni videos).
@@ -43,8 +55,21 @@ cd ..
 ```
 
 ## Uso diario
-Doble clic en `iniciar.bat`. Se abre la ventana del servidor (no la cierres) y el navegador en
-http://localhost:5000.
+Doble clic en `iniciar.bat`. Se abren **dos ventanas que no debes cerrar**:
+1. **Servidor**: la página en http://localhost:5000.
+2. **Agentes**: preparan carruseles, reels, publicaciones y turnos según su horario.
+
+Si la ventana de agentes está cerrada, Inicio muestra «Agentes: Apagados».
+
+### Flujo de cada semana
+1. **Sábado y miércoles**: aparece el carrusel en la bandeja (pestaña Contenido). Revísalo y apruébalo.
+2. **Lunes y viernes, 10 am**: transmiten. Configura OBS/StreamYard para que la grabación se guarde
+   (o la copies) en la carpeta `grabaciones/` del proyecto.
+3. **Unos minutos después**: llegan 3 reels a la bandeja. Si un recorte no quedó bien, usa
+   «Ajustar recorte» y escribe el segundo de inicio y de fin.
+4. **Al aprobar**: en `paquetes/<fecha>/subir_manual/<red>/` queda cada pieza con su `texto.txt`.
+   Súbela y presiona «Ya lo subí». YouTube se sube solo (en privado) si Google está autorizado.
+5. **Domingo 6 pm**: se reparten los turnos de la semana y se mandan las invitaciones.
 
 ## Acceso del aprobador desde otra computadora (Tailscale)
 Tailscale crea una red privada y cifrada entre tu PC y la del aprobador. La app **no** queda en
@@ -87,10 +112,69 @@ Si los dos tienen la bandeja abierta y actúan sobre el mismo paquete, el segund
 "Otra persona cambió este paquete" y la versión nueva, en lugar de pisar el cambio del primero.
 Cada acción queda en el historial (quién, qué y cuándo).
 
-Para probarla antes de tener agentes:
+Para probarla sin esperar a los agentes:
 ```powershell
-flask --app app paquete-demo      # mete un carrusel y un reel de ejemplo
+flask --app app carrusel 2026-10-19   # genera ya el carrusel de ese lunes
+flask --app app paquete-demo          # paquetes de ejemplo (solo texto)
 ```
+
+## Reels: cómo elige los 3 momentos
+Todo se hace en tu PC, sin pagar ninguna API:
+1. Whisper escribe lo que se dijo, con el segundo exacto de cada frase.
+2. Busca frases clave: «primer… quinto misterio» (vale más), «intenciones», oraciones y el cierre.
+3. Arma tramos de 30 a 55 s que empiezan al inicio de una frase y terminan al final de otra.
+4. Castiga los silencios (`silencedetect` de ffmpeg) y elige 3 sin encimarse, uno por tercio del rosario.
+5. ffmpeg lo pasa a vertical 1080×1920: el video al centro sobre su propio fondo difuminado,
+   subtítulos y el nombre del canal.
+
+Si una grabación falla, se ve en «Grabaciones recientes». Para intentarlo otra vez:
+`flask --app app reels-reintentar nombre-del-archivo.mkv`
+
+## Equipo y turnos
+En **Ajustes → Equipo** agrega a cada integrante (nombre y correo; de preferencia Gmail). Antes de
+guardarlo hay que confirmar que se le informó el aviso de privacidad. Los domingos a las 6 pm se
+reparten solos los lugares vacíos de la semana: le toca a quien lleva menos turnos en los últimos 90
+días. En la pestaña **Evento** puedes cambiar a mano quién dirige y quién apoya.
+
+## Reloj en vivo y overlay
+La pestaña **Evento** muestra la hora de la CDMX y la cuenta regresiva. El overlay para la
+transmisión está en `http://localhost:5000/reloj?tema=oscuro` (también `perla` y `chroma`):
+- **OBS**: Fuentes → + → Navegador → pega la dirección, 1920×1080.
+- **StreamYard**: abre el overlay en una ventana y compártela; con `chroma` se puede quitar el verde.
+
+El overlay no pide contraseña porque no muestra ningún dato privado, solo la hora.
+
+## Conectar Google (YouTube y Calendar), una sola vez
+1. Entra a https://console.cloud.google.com, crea un proyecto y activa **YouTube Data API v3** y
+   **Google Calendar API**.
+2. En «Pantalla de consentimiento de OAuth» elige *Externo* y agrega tu correo como usuario de prueba.
+3. En «Credenciales» → *Crear credenciales* → *ID de cliente de OAuth* → **App de escritorio**.
+   Descarga el JSON y guárdalo como `secretos/client_secret.json`.
+4. En la PC del sistema:
+   ```powershell
+   flask --app app google-autorizar
+   ```
+   Se abre el navegador; acepta los permisos. Se crea `secretos/token_google.json`.
+5. Listo: Inicio mostrará «Google Calendar conectado».
+
+**Importante:** mientras Google no verifique la app, los videos se suben en **privado** (así lo
+pide Google para apps sin verificar). Revísalo en YouTube Studio y cámbialo a público tú.
+
+## Publicación automática en Meta (opcional, fase 8)
+Por defecto Facebook e Instagram son manuales (carpetas en `subir_manual/`). Para automatizar:
+1. Crea una app en https://developers.facebook.com y conecta tu página de Facebook y tu cuenta
+   profesional de Instagram.
+2. Saca un **token de página de larga duración** con los permisos `pages_manage_posts`,
+   `pages_read_engagement`, `instagram_basic` e `instagram_content_publish`.
+3. En el `.env`: `META_AUTO=1`, `META_PAGE_ID`, `META_IG_USER_ID` y `META_TOKEN`.
+
+Qué se publica solo: el carrusel y el reel en Facebook, y el reel en Instagram. **El carrusel de
+Instagram sigue siendo manual**, porque la API de Instagram pide que cada imagen esté en una dirección
+pública de internet, y esta app vive solo en tu PC.
+
+Esta parte está probada con respuestas simuladas, no contra Meta real. La primera vez revisa que
+el post haya salido bien. Si algo falla, el paquete queda «Con error» y la carpeta para subir a
+mano se prepara sola.
 
 ## Variables de entorno (.env)
 | Variable | Para qué sirve | Ejemplo |
@@ -101,12 +185,25 @@ flask --app app paquete-demo      # mete un carrusel y un reel de ejemplo
 | `MAX_USUARIOS` | Máximo de cuentas | `2` |
 | `HOST` / `PORT` | Dónde escucha el servidor | `127.0.0.1` / `5000` |
 | `TAILSCALE` | El aprobador entra por `tailscale serve` | `1` |
+| `CANAL_NOMBRE` | Nombre en carruseles, reels y overlay | `Cristocéntricos` |
+| `CANAL_ENLACE` | Enlace del canal (opcional) en el carrusel | `youtube.com/@...` |
+| `WHISPER_MODELO` | Modelo de transcripción | `small` |
+| `APOYOS_POR_ROSARIO` | Cuántos apoyan además de quien dirige | `1` |
+| `GOOGLE_CALENDAR_ID` | Calendario de las invitaciones | `primary` |
+| `META_AUTO` | Publicación automática en Meta | `0` |
+| `META_PAGE_ID` / `META_IG_USER_ID` | IDs de la página y de Instagram | números |
+| `META_TOKEN` | Token de página (secreto) | — |
 
 ## Comandos útiles
 ```powershell
 flask --app app crear-usuario
 flask --app app cambiar-password gonza
 flask --app app paquete-demo   # paquetes de ejemplo en la bandeja
+flask --app app carrusel 2026-10-19 [--forzar]
+flask --app app reels-reintentar rosario.mkv
+flask --app app repartir       # turnos vacíos de las próximas 2 semanas
+flask --app app google-autorizar
+python -m agentes.worker       # la ventana de agentes, a mano
 pytest                 # pruebas
 pip-audit              # dependencias vulnerables (Python)
 cd frontend; npm audit # dependencias vulnerables (JavaScript)
@@ -120,11 +217,21 @@ cd frontend; npm audit # dependencias vulnerables (JavaScript)
 - Cabeceras de seguridad (CSP, sin iframes, nosniff).
 - El servidor solo escucha en esta PC (`127.0.0.1`); desde fuera solo se entra por Tailscale (HTTPS).
 - Con Tailscale, el bloqueo por intentos fallidos se lleva por cuenta de Tailscale.
+- **Nada se publica sin aprobación**: el agente de publicación vuelve a revisar el estado justo
+  antes de subir. Lo ya publicado no se puede regresar a pendientes.
+- Si los dos aprobadores actúan a la vez sobre el mismo paquete, el segundo recibe un aviso.
+- Tokens de Google y Meta solo en `secretos/` y `.env` (ambos fuera de git).
+- Las vistas previas solo entregan archivos declarados del paquete, dentro de `paquetes/`.
 
 ## Publicación
 No se publica en internet: es una app local. Si algún día se sube a Railway, cambiar SQLite
 por PostgreSQL y revisar el checklist de seguridad con Claude antes.
 
-## Privacidad
-El calendario del equipo (fase 6) guardará nombre y correo de los integrantes. Se mostrará un
-aviso de privacidad breve (LFPDPPP) explicando que solo se usan para enviar los turnos.
+## Privacidad (LFPDPPP)
+El calendario del equipo guarda nombre y correo de los integrantes, solo para asignar turnos y mandar
+invitaciones. Al agregar a alguien se confirma que se le informó el aviso de privacidad (queda la
+fecha). «Dar de baja» borra su nombre y su correo (derecho de cancelación) y sus turnos futuros.
+
+## Licencias de las fuentes
+Spectral, Public Sans y JetBrains Mono (`assets/fuentes/`) son libres (SIL Open Font License);
+las licencias están junto a los archivos.

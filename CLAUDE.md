@@ -174,8 +174,13 @@ Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
 7. **Reloj en vivo** + overlay de transmisión (oscuro / perla / verde chroma)
 8. (Futuro) Publicación automática en Meta
 
-**Estado:** fase 1 terminada (2026-10-16). Fase 2 terminada (2026-10-16): bandeja en `app/bandeja.py`
-(`crear_paquete()` para los agentes, `paquetes_aprobados()` para publicación) — 43 pruebas, pip-audit y npm audit sin vulnerabilidades.
+**Estado (2026-10-16):** fases 1 a 8 programadas — 122 pruebas, pip-audit y npm audit sin vulnerabilidades.
+- Bandeja: `app/bandeja.py` (`crear_paquete()`, `paquetes_aprobados()`, `actualizar_por_agente()`).
+- Agentes: `agentes/{carrusel,reels,publicacion,turnos}.py`, horario en `agentes/worker.py`.
+- Servicios: `servicios/{ffmpeg,whisper,google,youtube,calendario,meta}.py`.
+- Equipo/turnos: `app/equipo.py`. Estado general: `app/panel.py`. Overlay: `frontend/reloj.html`.
+- Migración automática de columnas en `app/migracion.py` (SQLite en WAL).
+- Pendiente con cuentas reales: autorizar Google y, si se quiere, Meta (`META_AUTO=1`, probado solo con simulaciones).
 
 Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos completos entregados.
 

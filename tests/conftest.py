@@ -18,6 +18,9 @@ def app(tmp_path):
         "BCRYPT_ROUNDS": 4,
         "LOG_DIR": tmp_path / "logs",
         "FRONTEND_DIST": tmp_path / "sin-frontend",
+        "PAQUETES_DIR": tmp_path / "paquetes",
+        "GRABACIONES_DIR": tmp_path / "grabaciones",
+        "SECRETOS_DIR": tmp_path / "secretos",
     })
     with app.app_context():
         db.session.add(Usuario(usuario="gonza", nombre="Gonza", hash_password=hashear(PASSWORD)))
@@ -37,3 +40,9 @@ def token(cliente):
 def login(cliente, usuario="gonza", password=PASSWORD):
     return cliente.post("/api/auth/login", json={"usuario": usuario, "password": password},
                         headers={"X-CSRFToken": token(cliente)})
+
+
+def enviar(cliente, ruta, datos=None, metodo="post"):
+    """POST/PATCH/PUT/DELETE con token CSRF."""
+    return getattr(cliente, metodo)(ruta, json=datos if datos is not None else {},
+                                    headers={"X-CSRFToken": token(cliente)})

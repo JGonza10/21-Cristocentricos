@@ -1,0 +1,114 @@
+"""Worker de agentes: la segunda ventana de iniciar.bat.
+
+    python -m agentes.worker
+
+Horarios (hora CDMX):
+  - cada minuto ........ latido (para que Inicio sepa que el worker está vivo)
+  - cada hora ........... carrusel de los próximos 2 días (si falta) e invitaciones
+  - cada 2 minutos ...... revisar grabaciones/ (además, watchdog avisa al instante)
+  - cada 30 segundos .... recortes de reels pedidos desde la bandeja
+  - cada 3 minutos ...... publicar lo aprobado
+  - domingo 6:00 pm ..... reparto de turnos de la semana
+"""
+import logging
+from datetime import datetime, timedelta
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.schedulers.blocking import BlockingScheduler
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+from app import create_app
+
+from . import carrusel, publicacion, reels, turnos
+from .estado import latido
+from .fechas import CDMX
+
+
+def _plural(n: int, uno: str, varios: str) -> str:
+    return f"{n} {uno if n == 1 else varios}"
+
+
+def crear_planificador(app) -> BlockingScheduler:
+    sched = BlockingScheduler(timezone=CDMX, executors={"default": ThreadPoolExecutor(3)},
+                              job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 300})
+
+    def trabajo(nombre: str, funcion, describir):
+        def correr():
+            with app.app_context():
+                try:
+                    resultado = funcion()
+                    latido(nombre, describir(resultado), ok=True)
+                except Exception:  # noqa: BLE001 — un agente que falla no tumba a los demás
+                    app.logger.exception("Falló el agente %s", nombre)
+                    latido(nombre, "Falló la última vez. Revisa datos/logs/app.log.", error=True)
+        return correr
+
+    ahora = datetime.now(CDMX)
+    sched.add_job(trabajo("worker", lambda: None, lambda _: "Activo"), "interval", minutes=1,
+                  id="latido", next_run_time=ahora)
+    sched.add_job(trabajo("carrusel", carrusel.tarea,
+                          lambda r: f"{_plural(len(r), 'carrusel nuevo', 'carruseles nuevos')} en la bandeja"
+                          if r else "Al día"),
+                  "cron", minute=5, id="carrusel", next_run_time=ahora + timedelta(seconds=5))
+    sched.add_job(trabajo("reels", reels.revisar_carpeta,
+                          lambda r: f"{_plural(len(r), 'reel nuevo', 'reels nuevos')} en la bandeja"
+                          if r else "Esperando grabaciones"),
+                  "interval", minutes=2, id="reels", next_run_time=ahora + timedelta(seconds=10))
+    sched.add_job(trabajo("recortes", reels.aplicar_recortes, lambda n: f"{n} recortes aplicados"),
+                  "interval", seconds=30, id="recortes")
+    sched.add_job(trabajo("publicacion", publicacion.tarea,
+                          lambda n: f"{_plural(n, 'paquete aprobado', 'paquetes aprobados')} revisados"),
+                  "interval", minutes=3, id="publicacion", next_run_time=ahora + timedelta(seconds=15))
+    sched.add_job(trabajo("turnos", turnos.tarea_reparto,
+                          lambda r: f"Reparto del domingo: {_plural(len(r), 'turno asignado', 'turnos asignados')}"),
+                  "cron", day_of_week="sun", hour=18, minute=0, id="reparto")
+    sched.add_job(trabajo("invitaciones", turnos.sincronizar_invitaciones,
+                          lambda n: f"{_plural(n, 'invitación actualizada', 'invitaciones actualizadas')}"),
+                  "cron", minute=20, id="invitaciones", next_run_time=ahora + timedelta(seconds=20))
+    return sched
+
+
+class AvisoGrabaciones(FileSystemEventHandler):
+    """Cuando aparece o cambia un video en grabaciones/, adelanta la revisión de reels."""
+
+    def __init__(self, sched: BlockingScheduler):
+        self.sched = sched
+
+    def on_any_event(self, evento):
+        if evento.is_directory or Path(evento.src_path).suffix.lower() not in reels.EXTENSIONES:
+            return
+        # Se espera a que el archivo deje de cambiar (OBS puede seguir escribiendo).
+        cuando = datetime.now(CDMX) + timedelta(seconds=reels.SEGUNDOS_ESTABLE + 5)
+        self.sched.modify_job("reels", next_run_time=cuando)
+
+
+def main() -> None:
+    app = create_app()
+    manejador = RotatingFileHandler(Path(app.config["LOG_DIR"]) / "worker.log", maxBytes=1_000_000,
+                                    backupCount=5, encoding="utf-8")
+    manejador.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    app.logger.addHandler(manejador)
+    logging.getLogger("apscheduler").addHandler(manejador)
+
+    carpeta = Path(app.config["GRABACIONES_DIR"])
+    carpeta.mkdir(parents=True, exist_ok=True)
+    sched = crear_planificador(app)
+    vigilante = Observer()
+    vigilante.schedule(AvisoGrabaciones(sched), str(carpeta), recursive=False)
+    vigilante.start()
+    print(f"Agentes de {app.config['CANAL_NOMBRE']} trabajando (no cierres esta ventana).")
+    print(f"Vigilando: {carpeta}")
+    try:
+        sched.start()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        vigilante.stop()
+        vigilante.join()
+
+
+if __name__ == "__main__":
+    main()

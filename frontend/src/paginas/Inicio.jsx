@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { agendaEditorial, fechaCorta, proximoRosario, semanaYSiguiente } from '../rosario.js'
+import { nombres } from '../util.js'
 
 const ETIQUETA_ESTADO = { pasado: 'ya pasó', 'hoy-terminado': 'hoy, ya pasó', hoy: 'hoy', 'en-vivo': 'en vivo' }
 
+function quienes(t) {
+  if (!t || (!t.dirige && t.apoyan.length === 0)) return 'Sin asignar'
+  const partes = []
+  if (t.dirige) partes.push(`Dirige ${t.dirige.nombre}`)
+  if (t.apoyan.length) partes.push(`apoya ${nombres(t.apoyan)}`)
+  return partes.join(' · ')
+}
+
 export default function Inicio({ ir }) {
   const [ahora, setAhora] = useState(() => new Date())
-  const [pendientes, setPendientes] = useState(null)
+  const [estado, setEstado] = useState(null)
+  const [turnos, setTurnos] = useState({})
   useEffect(() => {
-    api('/api/bandeja/conteos').then((d) => setPendientes(d.conteos.pendiente)).catch(() => setPendientes(null))
+    api('/api/estado').then(setEstado).catch(() => setEstado(null))
+    api('/api/turnos').then((d) => setTurnos(d.turnos)).catch(() => setTurnos({}))
   }, [])
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 60_000)
@@ -18,6 +29,8 @@ export default function Inicio({ ir }) {
   const proximo = proximoRosario(ahora)
   const semana = semanaYSiguiente(ahora)
   const agenda = agendaEditorial(ahora)
+  const tProximo = proximo && turnos[proximo.clave]
+  const pendientes = estado?.bandeja.pendiente
 
   return (
     <>
@@ -26,10 +39,17 @@ export default function Inicio({ ir }) {
           <div className="etiqueta">{proximo.estado === 'en-vivo' ? 'En vivo ahora' : 'Próximo evento'}</div>
           <h1>{proximo.nombre}</h1>
           <p className="meta">10:00 a 11:00 am · {proximo.misterios} · {proximo.faltan}</p>
-          <p className="aviso">
-            Todavía no se asigna quién dirige.{' '}
-            <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Asignar ahora</button>
-          </p>
+          {tProximo?.dirige ? (
+            <p className="meta" style={{ margin: 0 }}>
+              <b>{quienes(tProximo)}</b>{' '}
+              <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Ver evento</button>
+            </p>
+          ) : (
+            <p className="aviso">
+              Todavía no se asigna quién dirige.{' '}
+              <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Asignar ahora</button>
+            </p>
+          )}
         </section>
       )}
 
@@ -42,13 +62,25 @@ export default function Inicio({ ir }) {
         </article>
         <article className="tarjeta">
           <span className="etiqueta">Agentes</span>
-          <div className="estado off">Aún no activos</div>
-          <p className="chico-texto">Vigilarán las grabaciones, prepararán el carrusel 2 días antes y repartirán los turnos los domingos a las 6 pm. Se activan en las fases 3 a 6.</p>
+          {estado?.worker_activo
+            ? <div className="estado ok">Trabajando</div>
+            : <div className="estado warn">Apagados</div>}
+          <p className="chico-texto">
+            {estado?.worker_activo
+              ? 'Vigilan las grabaciones, preparan el carrusel 2 días antes y reparten turnos los domingos a las 6 pm.'
+              : 'Abre iniciar.bat en la PC del sistema para que trabajen los agentes.'}
+          </p>
         </article>
         <article className="tarjeta">
           <span className="etiqueta">Invitaciones</span>
-          <div className="estado warn">Correo sin configurar</div>
-          <p className="chico-texto">Se conecta con Google Calendar en la fase 6.</p>
+          {estado?.google
+            ? <div className="estado ok">Google Calendar conectado</div>
+            : <div className="estado warn">Google sin autorizar</div>}
+          <p className="chico-texto">
+            {estado?.google
+              ? 'Cada quien recibe en su calendario los rosarios que le tocan.'
+              : <>Ve a <button className="enlace" onClick={() => ir('configuracion')}>Ajustes</button> para ver cómo conectarlo.</>}
+          </p>
         </article>
       </section>
 
@@ -59,7 +91,7 @@ export default function Inicio({ ir }) {
             <li key={r.clave} className={`item ${r.estado === 'pasado' || r.estado === 'hoy-terminado' ? 'pasado' : ''} ${r.estado === 'hoy' || r.estado === 'en-vivo' ? 'hoy' : ''}`}>
               <div>
                 <b>{r.nombre}{ETIQUETA_ESTADO[r.estado] && <span className={`pill ${r.estado.startsWith('hoy') || r.estado === 'en-vivo' ? '' : 'gris'}`}>{ETIQUETA_ESTADO[r.estado]}</span>}</b>
-                <span className="muted">Sin asignar · {r.misterios.toLowerCase()}</span>
+                <span className="muted">{quienes(turnos[r.clave])} · {r.misterios.toLowerCase()}</span>
               </div>
               <button className="btn suave chico" onClick={() => ir('evento', r.clave)}>Ver</button>
             </li>

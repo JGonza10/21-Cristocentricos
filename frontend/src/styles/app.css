@@ -22,6 +22,7 @@ button{font-family:inherit}
 .btn:disabled{opacity:.5;cursor:default}
 .btn:not(:disabled):hover{filter:brightness(1.05)}
 .btn.suave:not(:disabled):hover{box-shadow:inset 0 0 0 1.5px var(--accent)}
+a.btn{text-decoration:none}
 .enlace{background:none;border:0;padding:0;color:var(--accent-strong);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 
 /* Formularios */
@@ -134,3 +135,33 @@ textarea:disabled,input:disabled{opacity:.7}
 .botones{display:flex;flex-wrap:wrap;gap:8px}
 @media (max-width:560px){.botones .btn{flex:1 1 100%}
   .filtros button{flex-direction:column;gap:2px;min-height:56px;padding:6px 4px;font-size:.82rem}}
+
+/* Fases 3 a 7 */
+.partir{overflow-wrap:anywhere}
+.pill.ambar{background:var(--warn-soft);color:var(--warn)}
+.dos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px}
+.dos h3{margin-bottom:6px}
+.formulario{display:grid;gap:12px}
+select{font:inherit;font-size:1rem;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-btn);
+  padding:10px 12px;min-height:46px;width:100%}
+select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+fieldset{border:0;padding:0;margin:0}
+legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
+.casilla{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;font-size:.95rem;margin:0;cursor:pointer}
+.casilla input{width:22px;height:22px;min-height:0;accent-color:var(--accent);flex:none}
+.botones-fila{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.ruta{display:block;font:500 .78rem var(--f-mono);color:var(--muted);overflow-wrap:anywhere;margin-top:4px}
+.item.pub .estado{font-size:.88rem;margin:2px 0 0}
+.recorte{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-item);padding:12px 14px;display:grid;gap:8px}
+.recorte .chico-texto{margin:0}
+.recorte-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.recorte-campos .chico-texto,.recorte-campos .botones{grid-column:1/-1}
+.reloj-grande{font:700 clamp(2.6rem,12vw,4.2rem)/1 var(--f-mono);color:var(--accent);font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.aviso-privacidad{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-item);padding:10px 14px}
+.aviso-privacidad summary{cursor:pointer;font-weight:700;color:var(--accent-strong);min-height:28px}
+.aviso-privacidad p{margin:8px 0 0;font-size:.9rem;color:var(--ink-2)}
+@media (max-width:560px){
+  .item.envuelve{flex-wrap:wrap}
+  .botones-fila{justify-content:flex-start;width:100%}
+  .botones-fila .btn{flex:1 1 auto}
+}

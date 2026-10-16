@@ -17,6 +17,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - name: Instalar ffmpeg (para la prueba de reels de punta a punta)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - run: pip install -r requirements.txt
       - name: Pruebas (pytest)
         run: pytest

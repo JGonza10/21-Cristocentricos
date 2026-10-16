@@ -64,8 +64,12 @@ class Paquete(db.Model):
     actualizado = db.Column(db.DateTime, default=ahora, nullable=False)
     revisado_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
     revisado_en = db.Column(db.DateTime)
+    # Datos extra del agente. Reels: {"grabacion_id", "inicio", "fin", "duracion_fuente", "recortar"}
+    datos = db.Column(db.JSON)
 
     revisado_por = db.relationship("Usuario")
+    publicaciones = db.relationship("Publicacion", order_by="Publicacion.id",
+                                    cascade="all, delete-orphan", back_populates="paquete")
     historial = db.relationship("HistorialPaquete", order_by="HistorialPaquete.id",
                                 cascade="all, delete-orphan", back_populates="paquete")
 
@@ -77,7 +81,13 @@ class Paquete(db.Model):
             "creado": _iso(self.creado), "actualizado": _iso(self.actualizado),
             "revisado_por": self.revisado_por.nombre if self.revisado_por else None,
             "revisado_en": _iso(self.revisado_en),
+            "datos": dict(self.datos or {}),
+            "publicaciones": [x.a_dict() for x in self.publicaciones],
         }
+
+    @property
+    def ya_publicado(self) -> bool:
+        return any(x.estado == "publicado" for x in self.publicaciones)
 
 
 class HistorialPaquete(db.Model):
@@ -102,3 +112,125 @@ class HistorialPaquete(db.Model):
 def _iso(fecha: datetime | None) -> str | None:
     """Fecha UTC en texto ISO con 'Z', para que el navegador la pase a su hora local."""
     return fecha.isoformat(timespec="seconds") + "Z" if fecha else None
+
+
+# --- Publicación (fases 5 y 8) ------------------------------------------------------
+
+REDES = ("instagram", "facebook", "tiktok", "youtube")
+# listo_manual = la carpeta subir_manual/<red>/ está lista; falta que alguien la suba.
+ESTADOS_PUBLICACION = ("listo_manual", "subiendo", "publicado", "error", "sin_configurar")
+
+
+class Publicacion(db.Model):
+    """Cómo va un paquete aprobado en cada red social."""
+    __tablename__ = "publicaciones"
+    __table_args__ = (db.UniqueConstraint("paquete_id", "red"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    paquete_id = db.Column(db.Integer, db.ForeignKey("paquetes.id"), nullable=False, index=True)
+    red = db.Column(db.String(20), nullable=False)
+    estado = db.Column(db.String(20), nullable=False)
+    ruta = db.Column(db.String(300))     # carpeta de subir_manual (relativa a paquetes/)
+    url = db.Column(db.String(300))      # enlace cuando se publicó automáticamente
+    intentos = db.Column(db.Integer, nullable=False, default=0)
+    error = db.Column(db.String(300))    # mensaje amable; el detalle va al log
+    actualizado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    paquete = db.relationship("Paquete", back_populates="publicaciones")
+
+    def a_dict(self) -> dict:
+        return {"red": self.red, "estado": self.estado, "ruta": self.ruta, "url": self.url,
+                "error": self.error, "actualizado": _iso(self.actualizado)}
+
+
+# --- Grabaciones (fase 4) -----------------------------------------------------------
+
+class Grabacion(db.Model):
+    """Cada video que llega a grabaciones/. Evita procesar dos veces el mismo archivo."""
+    __tablename__ = "grabaciones"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), unique=True, nullable=False)
+    tamano = db.Column(db.BigInteger, nullable=False, default=0)
+    fecha_evento = db.Column(db.Date)
+    estado = db.Column(db.String(20), nullable=False, default="nueva")  # nueva/procesando/lista/error
+    duracion = db.Column(db.Float)
+    segmentos = db.Column(db.JSON)       # transcripción: [[inicio, fin, texto], ...]
+    error = db.Column(db.String(300))
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+    actualizado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    def a_dict(self) -> dict:
+        return {"id": self.id, "nombre": self.nombre, "estado": self.estado, "error": self.error,
+                "fecha_evento": self.fecha_evento.isoformat() if self.fecha_evento else None,
+                "duracion": self.duracion, "actualizado": _iso(self.actualizado)}
+
+
+# --- Equipo y turnos (fase 6) -------------------------------------------------------
+
+ROLES_TURNO = ("dirige", "apoya")
+
+
+class Integrante(db.Model):
+    """Persona del equipo. No tiene cuenta: solo nombre y correo para las invitaciones."""
+    __tablename__ = "integrantes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(80), nullable=False)
+    correo = db.Column(db.String(120))   # vacío si se dio de baja (derecho de cancelación)
+    puede_dirigir = db.Column(db.Boolean, nullable=False, default=True)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    aviso_privacidad = db.Column(db.DateTime)  # cuándo se le informó el aviso
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    def a_dict(self) -> dict:
+        return {"id": self.id, "nombre": self.nombre, "correo": self.correo,
+                "puede_dirigir": self.puede_dirigir, "activo": self.activo,
+                "aviso_privacidad": _iso(self.aviso_privacidad)}
+
+
+class Turno(db.Model):
+    """Quién dirige y quién apoya en un rosario."""
+    __tablename__ = "turnos"
+    __table_args__ = (db.UniqueConstraint("fecha", "integrante_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, index=True)
+    rol = db.Column(db.String(10), nullable=False)
+    integrante_id = db.Column(db.Integer, db.ForeignKey("integrantes.id"), nullable=False)
+    automatico = db.Column(db.Boolean, nullable=False, default=False)
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    integrante = db.relationship("Integrante")
+
+    def a_dict(self) -> dict:
+        return {"rol": self.rol, "automatico": self.automatico, "integrante": self.integrante.a_dict()}
+
+
+class EventoCalendario(db.Model):
+    """El evento de Google Calendar de cada rosario (para actualizarlo si cambian los turnos)."""
+    __tablename__ = "eventos_calendario"
+
+    fecha = db.Column(db.Date, primary_key=True)
+    google_id = db.Column(db.String(200))
+    invitados = db.Column(db.JSON)       # correos a los que ya se invitó
+    estado = db.Column(db.String(20), nullable=False, default="pendiente")  # pendiente/enviada/error
+    error = db.Column(db.String(300))
+    actualizado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+
+# --- Estado de los agentes ----------------------------------------------------------
+
+class EstadoAgente(db.Model):
+    """Último latido y último resultado de cada agente (para la pantalla de Inicio)."""
+    __tablename__ = "estado_agentes"
+
+    nombre = db.Column(db.String(30), primary_key=True)
+    latido = db.Column(db.DateTime)
+    ultimo_ok = db.Column(db.DateTime)
+    mensaje = db.Column(db.String(300))
+    error = db.Column(db.Boolean, nullable=False, default=False)
+
+    def a_dict(self) -> dict:
+        return {"nombre": self.nombre, "latido": _iso(self.latido), "ultimo_ok": _iso(self.ultimo_ok),
+                "mensaje": self.mensaje, "error": self.error}

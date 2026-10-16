@@ -80,7 +80,7 @@ export default function App() {
       <main className="envoltura" role="tabpanel">
         {pestana === 'inicio' && <Inicio ir={ir} />}
         {pestana === 'contenido' && <Contenido />}
-        {pestana === 'evento' && <Evento fecha={fechaEvento} />}
+        {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}
       </main>
     </>
