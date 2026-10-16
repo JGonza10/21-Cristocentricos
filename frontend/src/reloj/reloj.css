@@ -1,5 +1,4 @@
-/* Overlay de transmisión. Colores propios de los 3 temas (no son la paleta de la app):
-   oscuro = vino muy oscuro, perla = crema, chroma = verde de croma con panel oscuro. */
+/* Overlay de transmisión. Solo se usa el tema perla (crema); las variables base quedan como respaldo. */
 :root {
   --ov-fondo:#140a0f; --ov-panel:#1f1117; --ov-borde:#3d1f2a; --ov-tinta:#fbf3f4; --ov-suave:#d7b9c0;
   --ov-acento:#e6b84e; --ov-vivo:#e0475f;
@@ -9,7 +8,6 @@
   --ov-fondo:#f4efe8; --ov-panel:#fffdf9; --ov-borde:#e6d9cc; --ov-tinta:#3a1420; --ov-suave:#7a5a62;
   --ov-acento:#8f6b10; --ov-vivo:#b3263e;
 }
-:root[data-overlay="chroma"] { --ov-fondo:#00b140; }
 * { box-sizing:border-box }
 html, body { margin:0; height:100%; background:var(--ov-fondo); color:var(--ov-tinta); font-family:var(--ov-texto) }
 #reloj { min-height:100%; display:grid; place-items:center; padding:4vmin }

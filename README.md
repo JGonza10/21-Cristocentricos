@@ -13,7 +13,7 @@ con tus cuentas reales: Google (YouTube y Calendar) y, si quieres, Meta.
 | Bandeja: aprobar, rechazar, editar texto, ajustar recorte | Cuando tú o el aprobador entran |
 | Carpetas `subir_manual/<red>/` y subida a YouTube (privado) | Solo, en cuanto algo se aprueba |
 | Reparto de turnos e invitaciones de Google Calendar | Domingos 6 pm (y botón «Repartir ahora») |
-| Reloj CDMX con cuenta regresiva y overlay para transmitir | Pestaña Evento y `/reloj` |
+| Reloj CDMX con cuenta regresiva (tema perla), se abre en grande desde un enlace chico | Pestaña Evento → «Reloj» (`/reloj`) |
 | Facebook e Instagram automáticos (opcional) | Si activas `META_AUTO=1` |
 
 ## Requisitos (Windows)
@@ -137,10 +137,11 @@ reparten solos los lugares vacíos de la semana: le toca a quien lleva menos tur
 días. En la pestaña **Evento** puedes cambiar a mano quién dirige y quién apoya.
 
 ## Reloj en vivo y overlay
-La pestaña **Evento** muestra la hora de la CDMX y la cuenta regresiva. El overlay para la
-transmisión está en `http://localhost:5021/reloj?tema=oscuro` (también `perla` y `chroma`):
+Casi no se usa, así que en la pestaña **Evento** solo hay un enlace chico «Reloj» que lo abre en
+grande en otra ventana: hora de la CDMX y cuenta regresiva, en tema perla. La dirección es
+`http://localhost:5021/reloj`:
 - **OBS**: Fuentes → + → Navegador → pega la dirección, 1920×1080.
-- **StreamYard**: abre el overlay en una ventana y compártela; con `chroma` se puede quitar el verde.
+- **StreamYard**: abre el reloj en una ventana y compártela.
 
 El overlay no pide contraseña porque no muestra ningún dato privado, solo la hora.
 

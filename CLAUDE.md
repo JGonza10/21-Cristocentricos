@@ -16,7 +16,7 @@ nada se publica sin visto bueno humano.
   y `texto.txt`; YouTube sube directo (privado hasta verificar la app de Google).
 - **Calendario del equipo:** turnos (dirige / apoya), reparto automático domingos 6 pm,
   invitaciones a Google Calendar.
-- **Reloj en vivo:** hora CDMX + cuenta regresiva, overlay para transmitir (temas oscuro/perla/verde chroma).
+- **Reloj en vivo:** hora CDMX + cuenta regresiva, solo tema perla; en Evento es un enlace chico «Reloj» que lo abre en grande (Gonza, 2026-10-16).
 - Redes: Instagram, Facebook, TikTok, YouTube y canal de TV (StreamYard).
 
 ## 2. Stack (confirmado 2026-10-16)
@@ -171,7 +171,7 @@ Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
 4. **Agente de reels** (watchdog + Whisper + reglas §2.1 + ffmpeg)
 5. **Agente de publicación** (`subir_manual/<red>/` + YouTube API en privado)
 6. **Calendario del equipo** (turnos, reparto domingos 6 pm, Google Calendar)
-7. **Reloj en vivo** + overlay de transmisión (oscuro / perla / verde chroma)
+7. **Reloj en vivo** + overlay de transmisión (solo perla, enlace chico en Evento)
 8. (Futuro) Publicación automática en Meta
 
 **Estado (2026-10-16):** fases 1 a 8 programadas — 122 pruebas, pip-audit y npm audit sin vulnerabilidades.

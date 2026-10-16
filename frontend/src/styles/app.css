@@ -156,7 +156,6 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
 .recorte .chico-texto{margin:0}
 .recorte-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .recorte-campos .chico-texto,.recorte-campos .botones{grid-column:1/-1}
-.reloj-grande{font:700 clamp(2.6rem,12vw,4.2rem)/1 var(--f-mono);color:var(--accent);font-variant-numeric:tabular-nums;margin:6px 0 4px}
 .aviso-privacidad{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-item);padding:10px 14px}
 .aviso-privacidad summary{cursor:pointer;font-weight:700;color:var(--accent-strong);min-height:28px}
 .aviso-privacidad p{margin:8px 0 0;font-size:.9rem;color:var(--ink-2)}
@@ -165,3 +164,4 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
   .botones-fila{justify-content:flex-start;width:100%}
   .botones-fila .btn{flex:1 1 auto}
 }
+.reloj-mini{display:inline-block;margin-top:10px;font-size:.78rem;font-weight:600;color:var(--ink-2)}

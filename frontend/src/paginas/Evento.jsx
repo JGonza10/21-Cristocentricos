@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { infoRosario, proximoRosario } from '../rosario.js'
-import { cuenta, estadoReloj, horaCDMX } from '../reloj/tiempo.js'
 import { fechaDeClave, nombres } from '../util.js'
 
-const TEMAS = [
-  { id: 'oscuro', nombre: 'Oscuro' },
-  { id: 'perla', nombre: 'Perla' },
-  { id: 'chroma', nombre: 'Verde chroma' },
-]
 const MAX_APOYOS = 3
 
 export default function Evento({ fecha, ir }) {
@@ -21,9 +15,9 @@ export default function Evento({ fecha, ir }) {
         <div className="etiqueta">{r.estado === 'en-vivo' ? 'En vivo ahora' : 'Evento'}</div>
         <h1>{r.nombre}</h1>
         <p className="meta" style={{ margin: 0 }}>10:00 a 11:00 am · {r.misterios} · {r.faltan}</p>
+        <button className="enlace reloj-mini" onClick={abrirReloj} title="Abre el reloj en grande">Reloj</button>
       </section>
       <Turnos clave={r.clave} yaPaso={yaPaso} ir={ir} />
-      <Reloj />
     </>
   )
 }
@@ -143,54 +137,7 @@ function Turnos({ clave, yaPaso, ir }) {
   )
 }
 
-function Reloj() {
-  const [ahora, setAhora] = useState(() => new Date())
-  const [copiado, setCopiado] = useState('')
-  useEffect(() => {
-    const t = setInterval(() => setAhora(new Date()), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const e = estadoReloj(ahora)
-  const base = `${window.location.origin}/reloj`
-
-  async function copiar(url, tema) {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiado(tema)
-    } catch {
-      setCopiado('')
-    }
-  }
-
-  return (
-    <section className="tarjeta">
-      <span className="etiqueta">Reloj en vivo</span>
-      <div className="reloj-grande" aria-live="off">{horaCDMX(ahora)}</div>
-      <p className="chico-texto">Hora de la Ciudad de México</p>
-      <div className={`estado ${e.modo === 'vivo' ? 'ok' : 'off'}`} style={{ marginTop: 10 }}>
-        {e.modo === 'vivo' && `En vivo · faltan ${cuenta(e.restante)} para terminar`}
-        {e.modo === 'antes' && `${e.rosario.nombre}: comienza en ${cuenta(e.faltan)}`}
-        {e.modo === 'nada' && 'Sin rosarios próximos'}
-      </div>
-      <h3 style={{ marginTop: 18 }}>Overlay para la transmisión</h3>
-      <p className="chico-texto" style={{ marginBottom: 10 }}>
-        En OBS: Fuente → Navegador → pega la dirección (1920×1080). Con StreamYard: abre el overlay en una ventana
-        y compártela; con «Verde chroma» puedes quitar el fondo verde.
-      </p>
-      <ul className="lista">
-        {TEMAS.map((t) => {
-          const url = `${base}?tema=${t.id}`
-          return (
-            <li key={t.id} className="item envuelve">
-              <div><b>{t.nombre}</b><code className="ruta">{url}</code></div>
-              <div className="botones-fila">
-                <a className="btn suave chico" href={url} target="_blank" rel="noreferrer">Abrir</a>
-                <button className="btn suave chico" onClick={() => copiar(url, t.id)}>{copiado === t.id ? '¡Copiado!' : 'Copiar'}</button>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
-  )
+// Reloj de la transmisión: casi nunca se usa, así que solo es un enlace chico que lo abre en grande.
+function abrirReloj() {
+  window.open('/reloj', 'reloj', 'popup,width=1280,height=720')
 }

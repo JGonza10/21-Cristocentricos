@@ -1,16 +1,14 @@
 // Overlay del reloj para la transmisión (OBS / ventana compartida en StreamYard).
 // Página pública SIN datos privados: no llama a la API, todo se calcula en el navegador.
-//   /reloj?tema=oscuro|perla|chroma&canal=Cristocéntricos
+//   /reloj?canal=Cristocéntricos  (solo tema perla, a pedido de Gonza)
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { cuenta, estadoReloj, horaCDMX } from './tiempo.js'
 import './reloj.css'
 
-const TEMAS = ['oscuro', 'perla', 'chroma']
 const params = new URLSearchParams(window.location.search)
-const tema = TEMAS.includes(params.get('tema')) ? params.get('tema') : 'oscuro'
 const canal = (params.get('canal') || 'Cristocéntricos').slice(0, 40)
-document.documentElement.dataset.overlay = tema
+document.documentElement.dataset.overlay = 'perla'
 
 function Overlay() {
   const [ahora, setAhora] = useState(() => new Date())
