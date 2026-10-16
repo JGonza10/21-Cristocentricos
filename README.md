@@ -3,7 +3,7 @@
 Convierte cada Santo Rosario en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
 invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
 
-**Estado:** fase 1 (inicio de sesión seguro). Ver `CLAUDE.md` para el plan completo.
+**Estado:** fase 2 (bandeja de aprobación). Ver `CLAUDE.md` para el plan completo.
 
 ## Requisitos (Windows)
 - Python 3.12 o superior
@@ -76,6 +76,22 @@ flask --app app run --debug
 cd frontend; npm run dev          # abre http://localhost:5173
 ```
 
+## Bandeja de aprobación (pestaña Contenido)
+Todo lo que preparan los agentes entra como **pendiente**. Desde ahí cualquiera de los dos puede:
+- **Editar el texto** (máximo 2,200 caracteres, el límite de Instagram) y guardarlo.
+- **Aprobar**: solo lo aprobado lo tomará el agente de publicación (fase 5).
+- **Rechazar**, con un motivo opcional.
+- **Regresar a pendientes** algo ya aprobado o rechazado, para corregirlo.
+
+Si los dos tienen la bandeja abierta y actúan sobre el mismo paquete, el segundo ve el aviso
+"Otra persona cambió este paquete" y la versión nueva, en lugar de pisar el cambio del primero.
+Cada acción queda en el historial (quién, qué y cuándo).
+
+Para probarla antes de tener agentes:
+```powershell
+flask --app app paquete-demo      # mete un carrusel y un reel de ejemplo
+```
+
 ## Variables de entorno (.env)
 | Variable | Para qué sirve | Ejemplo |
 |---|---|---|
@@ -90,6 +106,7 @@ cd frontend; npm run dev          # abre http://localhost:5173
 ```powershell
 flask --app app crear-usuario
 flask --app app cambiar-password gonza
+flask --app app paquete-demo   # paquetes de ejemplo en la bandeja
 pytest                 # pruebas
 pip-audit              # dependencias vulnerables (Python)
 cd frontend; npm audit # dependencias vulnerables (JavaScript)

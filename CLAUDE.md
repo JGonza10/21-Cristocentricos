@@ -174,7 +174,8 @@ Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
 7. **Reloj en vivo** + overlay de transmisión (oscuro / perla / verde chroma)
 8. (Futuro) Publicación automática en Meta
 
-**Estado:** fase 1 terminada (2026-10-16) — 24 pruebas, pip-audit y npm audit sin vulnerabilidades.
+**Estado:** fase 1 terminada (2026-10-16). Fase 2 terminada (2026-10-16): bandeja en `app/bandeja.py`
+(`crear_paquete()` para los agentes, `paquetes_aprobados()` para publicación) — 43 pruebas, pip-audit y npm audit sin vulnerabilidades.
 
 Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos completos entregados.
 

@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
+import { api } from '../api.js'
 import { agendaEditorial, fechaCorta, proximoRosario, semanaYSiguiente } from '../rosario.js'
 
 const ETIQUETA_ESTADO = { pasado: 'ya pasó', 'hoy-terminado': 'hoy, ya pasó', hoy: 'hoy', 'en-vivo': 'en vivo' }
 
 export default function Inicio({ ir }) {
   const [ahora, setAhora] = useState(() => new Date())
+  const [pendientes, setPendientes] = useState(null)
+  useEffect(() => {
+    api('/api/bandeja/conteos').then((d) => setPendientes(d.conteos.pendiente)).catch(() => setPendientes(null))
+  }, [])
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 60_000)
     return () => clearInterval(t)
@@ -31,8 +36,8 @@ export default function Inicio({ ir }) {
       <section className="tres">
         <article className="tarjeta">
           <span className="etiqueta">Bandeja</span>
-          <div className="numero">0</div>
-          <p className="chico-texto" style={{ marginBottom: 12 }}>paquetes por revisar</p>
+          <div className="numero">{pendientes ?? '–'}</div>
+          <p className="chico-texto" style={{ marginBottom: 12 }}>{pendientes === 1 ? 'paquete por revisar' : 'paquetes por revisar'}</p>
           <button className="btn suave chico" onClick={() => ir('contenido')}>Ir a la bandeja</button>
         </article>
         <article className="tarjeta">

@@ -110,3 +110,27 @@ input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--a
   .pestanas .largo{display:none}
   .pestanas .corto{display:inline}
 }
+
+/* Bandeja de aprobación */
+textarea{font:inherit;font-size:1rem;line-height:1.5;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:var(--r-btn);padding:10px 12px;min-height:132px;width:100%;resize:vertical}
+textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+textarea:disabled,input:disabled{opacity:.7}
+.filtros{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.filtros button{min-height:44px;padding:0 10px;justify-content:center;border:1px solid var(--line);border-radius:var(--r-btn);background:var(--surface-2);
+  color:var(--ink-2);font:700 .9rem var(--f-body);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.filtros button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.filtros .cuenta{font:700 .78rem var(--f-mono);background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px}
+.filtros button[aria-pressed="true"] .cuenta{background:rgba(255,255,255,.22);color:inherit}
+.paquete{display:grid;gap:12px}
+.paq-cabeza{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.paq-cabeza .pill{margin-left:0}
+.previas{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory}
+.previas img,.previas video{display:block;height:200px;width:auto;max-width:80vw;border-radius:var(--r-item);border:1px solid var(--line);
+  background:var(--surface-2);scroll-snap-align:start;object-fit:cover}
+.contador{text-align:right}
+.texto-final{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:var(--r-item);padding:12px 14px;margin:0}
+.botones{display:flex;flex-wrap:wrap;gap:8px}
+@media (max-width:560px){.botones .btn{flex:1 1 100%}
+  .filtros button{flex-direction:column;gap:2px;min-height:56px;padding:6px 4px;font-size:.82rem}}

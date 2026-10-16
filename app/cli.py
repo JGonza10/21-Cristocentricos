@@ -1,7 +1,10 @@
-"""Comandos de consola: flask --app app crear-usuario / cambiar-password."""
+"""Comandos de consola: flask --app app crear-usuario / cambiar-password / paquete-demo."""
+from datetime import date, timedelta
+
 import click
 from flask import current_app
 
+from .bandeja import crear_paquete
 from .extensiones import db
 from .modelos import Usuario
 from .seguridad import hashear, normalizar_usuario, problema_password
@@ -45,3 +48,18 @@ def registrar(app):
         u.hash_password = hashear(_pedir_password())
         db.session.commit()
         click.echo("Contraseña actualizada.")
+
+    @app.cli.command("paquete-demo")
+    def paquete_demo():
+        """Mete un carrusel y un reel de ejemplo a la bandeja (para probarla sin agentes)."""
+        hoy = date.today()
+        lunes = hoy + timedelta(days=(0 - hoy.weekday()) % 7 or 7)
+        crear_paquete(
+            "carrusel", lunes, f"Invitación al rosario del lunes {lunes.day}",
+            "Te invitamos a rezar juntos el Santo Rosario en vivo este lunes a las 10:00 am "
+            "(hora CDMX). Meditaremos los misterios gozosos.\n\n"
+            "Deja tus intenciones en los comentarios.\n\n#SantoRosario #Cristocéntricos #MisteriosGozosos")
+        crear_paquete(
+            "reel", hoy, "Reel 1 · Anuncio del primer misterio",
+            "Primer misterio gozoso: la Anunciación del ángel a María.\n\n#SantoRosario #Cristocéntricos")
+        click.echo("Listo: 2 paquetes de ejemplo en la bandeja (pestaña Contenido).")
