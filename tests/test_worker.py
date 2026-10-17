@@ -83,3 +83,4 @@ def test_estado_trae_conteos_para_el_diagrama(app, cliente):
     assert d["pendientes_por_tipo"] == {"carrusel": 1, "reel": 2}
     assert d["grabaciones_conteo"] == {"procesando": 1}
     assert d["publicaciones_conteo"] == {"error": 1}
+    assert d["publicaciones_por_red"] == {"youtube": {"error": 1}}

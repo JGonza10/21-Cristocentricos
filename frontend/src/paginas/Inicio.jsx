@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { proximoEvento } from '../evento.js'
 import { nombres } from '../util.js'
-import { calcularPasos, ESTADOS } from '../pasos.js'
+import { calcularVivo, ESTADOS, QUIEN } from '../pasos.js'
 import Flujo from '../componentes/Flujo.jsx'
 import CalendarioEventos from '../componentes/CalendarioEventos.jsx'
 import '../styles/inicio.css'
 
 const REFRESCO_MS = 20_000
-const CLASE_ESTADO = { ok: 'ok', activo: 'activo', espera: 'warn', error: 'err', apagado: 'off' }
+const CLASE_ESTADO = { ok: 'ok', activo: 'activo', espera: 'warn', error: 'err', apagado: 'off', sin: 'off' }
 
 // Botón de cada tarjeta: a dónde lleva resolver ese paso.
 const ACCION = {
@@ -17,6 +17,7 @@ const ACCION = {
   reels: { texto: 'Ver en la bandeja', destino: 'contenido' },
   bandeja: { texto: 'Ir a la bandeja', destino: 'contenido' },
   publicacion: { texto: 'Ver publicaciones', destino: 'contenido' },
+  redes: { texto: 'Ver publicaciones', destino: 'contenido' },
 }
 
 function quienes(t) {
@@ -55,7 +56,7 @@ export default function Inicio({ ir }) {
 
   const proximo = proximoEvento(ahora)
   const tProximo = proximo && turnos[proximo.clave]
-  const pasos = calcularPasos(estado, turnos, ahora)
+  const { pasos, nodos } = calcularVivo(estado, turnos, ahora)
   const trabajando = Boolean(estado?.worker_activo)
 
   function accion(id) {
@@ -85,27 +86,21 @@ export default function Inicio({ ir }) {
         </section>
       )}
 
-      <section className="tarjeta">
-        <div className="flujo-cabeza">
-          <span className="etiqueta">Así va el trabajo</span>
-          {estado && (trabajando
-            ? <span className="estado activo">Agentes trabajando</span>
-            : <span className="estado off">Agentes apagados · abre iniciar.bat</span>)}
-        </div>
-        <Flujo pasos={pasos} trabajando={trabajando} alElegir={(id) => bajarA(`paso-${id}`)} />
-        <div className="flujo-leyenda" aria-hidden="true">
-          {Object.entries(ESTADOS).map(([k, v]) => <span key={k} className={`ley ${k}`}><i />{v}</span>)}
-        </div>
+      <section className="tarjeta flujo-tarjeta">
+        <span className="etiqueta">Cómo funciona y cómo va</span>
+        <Flujo pasos={pasos} nodosVivo={nodos} trabajando={trabajando} alVerTarjeta={(id) => bajarA(`paso-${id}`)} />
       </section>
 
       <section className="pasos">
         {pasos.map((p) => (
-          <article key={p.id} id={`paso-${p.id}`} className={`tarjeta paso ${p.estado}`}>
-            <span className="etiqueta">{p.numero} · {p.titulo}</span>
-            <div className={`estado ${CLASE_ESTADO[p.estado]}`}>{ESTADOS[p.estado]}</div>
+          <article key={p.id} id={`paso-${p.id}`} className={`tarjeta paso e-${p.estado ?? 'ninguno'}`}>
+            <span className="etiqueta">Paso {p.numero}</span>
+            <h3 className="paso-titulo">{p.t}</h3>
+            <span className={`quien q-${p.q}`}>{QUIEN[p.q]}</span>
+            {p.estado && <div className={`estado ${CLASE_ESTADO[p.estado]}`}>{ESTADOS[p.estado]}</div>}
             <p className="paso-resumen">{p.resumen}</p>
             {p.detalle.map((d) => <p key={d} className="chico-texto">{d}</p>)}
-            <p className="chico-texto paso-que">{p.que}</p>
+            <p className="chico-texto paso-que">{p.x}</p>
             {ACCION[p.id] && (
               <div className="botones paso-accion">
                 <button className="btn suave chico" onClick={() => accion(p.id)}>{ACCION[p.id].texto}</button>

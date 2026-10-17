@@ -27,6 +27,14 @@ def _contar(columna, *filtros) -> dict:
     return {valor: n for valor, n in consulta.all()}
 
 
+def _por_red() -> dict:
+    """{red: {estado: cantidad}} para pintar cada red en el diagrama."""
+    resultado: dict = {}
+    for red, est, n in db.session.query(Publicacion.red, Publicacion.estado, func.count())             .group_by(Publicacion.red, Publicacion.estado).all():
+        resultado.setdefault(red, {})[est] = n
+    return resultado
+
+
 @bp.get("/estado")
 @login_requerido
 def estado():
@@ -40,6 +48,7 @@ def estado():
         pendientes_por_tipo=_contar(Paquete.tipo, Paquete.estado == "pendiente"),
         grabaciones_conteo=_contar(Grabacion.estado),
         publicaciones_conteo=_contar(Publicacion.estado),
+        publicaciones_por_red=_por_red(),
         worker_activo=activo,
         agentes=[{**(registros[n].a_dict() if n in registros else {"nombre": n}), "titulo": t}
                  for n, t in AGENTES.items() if n != "worker"],

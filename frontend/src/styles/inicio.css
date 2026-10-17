@@ -1,68 +1,21 @@
-/* Inicio: diagrama del flujo, tarjetas por paso y calendario de eventos. */
+/* Inicio: tarjetas por paso y calendario de eventos (el diagrama está en lienzo.css). */
 .estado.err{color:var(--err)}
 .estado.activo{color:var(--activo)}
 .estado.activo::before{animation:latido 1.4s ease-in-out infinite}
 @keyframes latido{50%{opacity:.3}}
 
-/* Diagrama */
-.flujo-cabeza{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
-.flujo-cabeza .etiqueta{margin:0}
-.flujo-cabeza .estado{margin:0;font-size:.85rem}
-.flujo{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center;gap:30px 28px;
-  grid-template-areas:"turnos grabacion reels bandeja publicacion" ". . carrusel bandeja publicacion"}
-.flujo-lineas{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-.linea path{fill:none;stroke:var(--off);stroke-width:2;stroke-linecap:round;stroke-dasharray:2 7}
-.linea polygon{fill:var(--off)}
-.flujo.trabajando .linea path{stroke:var(--accent);opacity:.55;animation:fluir 1.6s linear infinite}
-.flujo.trabajando .linea polygon{fill:var(--accent);opacity:.55}
-.flujo.trabajando .linea.activa path{stroke:var(--activo);opacity:1;stroke-width:2.5;animation-duration:.6s}
-.flujo.trabajando .linea.activa polygon{fill:var(--activo);opacity:1}
-@keyframes fluir{to{stroke-dashoffset:-18}}
-.nodo{position:relative;z-index:1;display:grid;gap:3px;text-align:left;min-height:64px;padding:10px 12px;border-radius:var(--r-item);
-  background:var(--surface);border:1.5px solid var(--line);color:var(--ink);font:inherit;cursor:pointer;min-width:0}
-.nodo:hover{border-color:var(--accent)}
-.nodo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.nodo-titulo{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nodo-num{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;font:700 .7rem var(--f-mono);
-  background:var(--accent-soft);color:var(--accent-strong)}
-.nodo-dato{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nodo.ok{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
-.nodo.ok .nodo-dato{color:var(--ok)}
-.nodo.espera{border-color:var(--warn);background:var(--warn-soft)}
-.nodo.espera .nodo-dato{color:var(--warn);font-weight:700}
-.nodo.error{border-color:var(--err);background:var(--err-soft)}
-.nodo.error .nodo-dato{color:var(--err);font-weight:700}
-.nodo.apagado{border-style:dashed}
-.nodo.apagado .nodo-titulo{color:var(--muted)}
-.nodo.activo{border-color:var(--activo);background:var(--activo-soft)}
-.nodo.activo .nodo-dato{color:var(--activo);font-weight:700}
-.nodo.activo::after{content:"";position:absolute;inset:-5px;border-radius:calc(var(--r-item) + 4px);border:2px solid var(--activo);
-  opacity:0;animation:onda 1.8s ease-out infinite;pointer-events:none}
-@keyframes onda{0%{opacity:.7;transform:scale(.97)}100%{opacity:0;transform:scale(1.06)}}
-.flujo-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:18px;font-size:.78rem;color:var(--muted)}
-.ley{display:inline-flex;align-items:center;gap:6px}
-.ley i{width:10px;height:10px;border-radius:3px;border:1.5px solid var(--line);background:var(--surface)}
-.ley.ok i{border-color:var(--ok)}
-.ley.activo i{border-color:var(--activo);background:var(--activo-soft)}
-.ley.espera i{border-color:var(--warn);background:var(--warn-soft)}
-.ley.error i{border-color:var(--err);background:var(--err-soft)}
-.ley.apagado i{border-style:dashed}
-@media (max-width:760px){
-  .flujo{grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 22px;
-    grid-template-areas:"turnos carrusel" "grabacion carrusel" "reels ." "bandeja bandeja" "publicacion publicacion"}
-  .nodo.ancho{justify-self:center;width:min(100%,220px)}
-}
-
 /* Tarjetas por paso */
 .pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
 .paso{display:flex;flex-direction:column;scroll-margin:90px}
+.paso-titulo{margin:2px 0 8px}
+.paso .quien{align-self:flex-start;margin-bottom:10px}
 .paso-resumen{margin:0 0 6px;color:var(--ink-2);font-weight:600}
 .paso .chico-texto + .chico-texto{margin-top:4px}
 .paso .paso-que{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 .paso .paso-accion{margin-top:auto;padding-top:12px}
-.paso.espera{border-color:var(--warn)}
-.paso.error{border-color:var(--err)}
-.paso.activo{border-color:var(--activo)}
+.paso.e-espera{border-color:var(--warn)}
+.paso.e-error{border-color:var(--err)}
+.paso.e-activo{border-color:var(--activo)}
 .resaltar{animation:resaltar 1.4s ease-out}
 @keyframes resaltar{0%,40%{box-shadow:0 0 0 4px var(--accent-soft),0 0 0 6px var(--accent)}100%{box-shadow:var(--shadow)}}
 
@@ -111,5 +64,5 @@
 }
 
 @media (prefers-reduced-motion:reduce){
-  .flujo.trabajando .linea path,.nodo.activo::after,.estado.activo::before,.resaltar{animation:none}
+  .estado.activo::before,.resaltar{animation:none}
 }
