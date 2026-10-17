@@ -156,9 +156,6 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
 .recorte .chico-texto{margin:0}
 .recorte-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .recorte-campos .chico-texto,.recorte-campos .botones{grid-column:1/-1}
-.aviso-privacidad{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-item);padding:10px 14px}
-.aviso-privacidad summary{cursor:pointer;font-weight:700;color:var(--accent-strong);min-height:28px}
-.aviso-privacidad p{margin:8px 0 0;font-size:.9rem;color:var(--ink-2)}
 @media (max-width:560px){
   .item.envuelve{flex-wrap:wrap}
   .botones-fila{justify-content:flex-start;width:100%}
@@ -169,3 +166,5 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
 /* Firma */
 .pie{text-align:center;padding:24px 16px 32px;font-size:.85rem;color:var(--muted)}
 .kestrel-link{color:inherit;text-decoration:none}.kestrel-link:hover{text-decoration:underline}
+.eq-editar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%}
+.eq-editar input{flex:1 1 180px;min-width:0}

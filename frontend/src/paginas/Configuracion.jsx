@@ -5,11 +5,10 @@ import { fechaHora } from '../util.js'
 export default function Configuracion({ usuario }) {
   const [estado, setEstado] = useState(null)
   useEffect(() => { api('/api/estado').then(setEstado).catch(() => setEstado(null)) }, [])
-  const canal = estado?.canal || 'Cristocéntricos'
 
   return (
     <>
-      <Equipo canal={canal} />
+      <Equipo />
       <Conexiones estado={estado} />
       <section className="tarjeta">
         <span className="etiqueta">Tu cuenta</span>
@@ -34,27 +33,12 @@ export default function Configuracion({ usuario }) {
   )
 }
 
-function AvisoPrivacidad({ canal }) {
-  return (
-    <details className="aviso-privacidad">
-      <summary>Leer el aviso de privacidad</summary>
-      <p>
-        <b>Aviso de privacidad simplificado.</b> {canal} usa tu nombre y tu correo electrónico únicamente para
-        asignarte turnos en los eventos y enviarte la invitación a tu calendario (Google Calendar). No se
-        venden, no se comparten con nadie más y no se usan para otros fines. Se guardan en la computadora del
-        equipo. Puedes pedir en cualquier momento que se corrijan o se borren (derechos ARCO) con la persona que
-        coordina el equipo.
-      </p>
-    </details>
-  )
-}
-
-function Equipo({ canal }) {
+function Equipo() {
   const [gente, setGente] = useState(null)
   const [nombre, setNombre] = useState('')
   const [correo, setCorreo] = useState('')
   const [dirige, setDirige] = useState(true)
-  const [aviso, setAviso] = useState(false)
+  const [editando, setEditando] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
@@ -78,25 +62,32 @@ function Equipo({ canal }) {
   function agregar(ev) {
     ev.preventDefault()
     accion(async () => {
-      const d = await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige, aviso } })
+      const d = await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige } })
       setGente((g) => [...g, d.integrante].sort((a, b) => b.activo - a.activo || a.nombre.localeCompare(b.nombre)))
-      setNombre(''); setCorreo(''); setDirige(true); setAviso(false)
+      setNombre(''); setCorreo(''); setDirige(true)
     }, 'Integrante agregado.')
   }
 
-  function cambiar(i, datos) {
+  function cambiar(i, datos, exito) {
     accion(async () => {
       const d = await api(`/api/equipo/${i.id}`, { metodo: 'PATCH', datos })
       setGente((g) => g.map((x) => (x.id === i.id ? d.integrante : x)))
-    })
+      setEditando(null)
+    }, exito)
+  }
+
+  function pausar(i) {
+    cambiar(i, { activo: !i.activo }, i.activo
+      ? `${i.nombre} quedó en pausa: no recibe turnos, invitaciones ni correos.`
+      : `${i.nombre} vuelve a recibir turnos e invitaciones.`)
   }
 
   function baja(i) {
-    if (!window.confirm(`¿Dar de baja a ${i.nombre}? Se borran su nombre, su correo y sus turnos futuros.`)) return
+    if (!window.confirm(`¿Borrar a ${i.nombre}? Se borran su nombre, su correo y sus turnos futuros. Si solo quieres que no reciba correos por un tiempo, usa Pausar.`)) return
     accion(async () => {
       await api(`/api/equipo/${i.id}`, { metodo: 'DELETE' })
       setGente((g) => g.filter((x) => x.id !== i.id))
-    }, 'Dado de baja. Sus datos personales se borraron.')
+    }, 'Borrado. Sus datos personales se eliminaron.')
   }
 
   function repartir() {
@@ -111,7 +102,8 @@ function Equipo({ canal }) {
       <span className="etiqueta">Equipo</span>
       <p className="chico-texto" style={{ marginBottom: 12 }}>
         Los integrantes no tienen cuenta: solo su nombre y correo para mandarles la invitación. Cada domingo a las
-        6 pm se reparten solos los turnos de la semana, a quien lleva menos turnos.
+        6 pm se reparten solos los turnos de la semana, a quien lleva menos turnos. Quien está en pausa no recibe
+        turnos, invitaciones ni correos: úsalo para hacer pruebas sin molestar a nadie.
       </p>
       {gente === null && !error && <p className="vacio">Cargando…</p>}
       {gente?.length === 0 && <p className="vacio">Todavía no hay integrantes.</p>}
@@ -119,19 +111,35 @@ function Equipo({ canal }) {
         <ul className="lista">
           {gente.map((i) => (
             <li key={i.id} className={`item envuelve ${i.activo ? '' : 'pasado'}`}>
-              <div>
-                <b>{i.nombre}{!i.activo && <span className="pill gris">inactivo</span>}</b>
-                <span className="muted partir">{i.correo} · {i.puede_dirigir ? 'dirige y apoya' : 'solo apoya'}</span>
-              </div>
-              <div className="botones-fila">
-                <button className="btn suave chico" disabled={ocupado} onClick={() => cambiar(i, { puede_dirigir: !i.puede_dirigir })}>
-                  {i.puede_dirigir ? 'Solo apoya' : 'Puede dirigir'}
-                </button>
-                <button className="btn suave chico" disabled={ocupado} onClick={() => cambiar(i, { activo: !i.activo })}>
-                  {i.activo ? 'Pausar' : 'Activar'}
-                </button>
-                <button className="btn suave chico" disabled={ocupado} onClick={() => baja(i)}>Dar de baja</button>
-              </div>
+              {editando?.id === i.id ? (
+                <form className="eq-editar" onSubmit={(e) => { e.preventDefault(); cambiar(i, { nombre: editando.nombre, correo: editando.correo }, 'Datos guardados.') }}>
+                  <input aria-label="Nombre" value={editando.nombre} maxLength={80} required autoComplete="off"
+                    onChange={(e) => setEditando({ ...editando, nombre: e.target.value })} />
+                  <input aria-label="Correo" type="email" value={editando.correo} maxLength={120} required autoComplete="off" inputMode="email"
+                    onChange={(e) => setEditando({ ...editando, correo: e.target.value })} />
+                  <div className="botones-fila">
+                    <button className="btn chico" type="submit" disabled={ocupado}>Guardar</button>
+                    <button className="btn suave chico" type="button" disabled={ocupado} onClick={() => setEditando(null)}>Cancelar</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div>
+                    <b>{i.nombre}{!i.activo && <span className="pill gris">en pausa</span>}</b>
+                    <span className="muted partir">{i.correo} · {i.puede_dirigir ? 'dirige y apoya' : 'solo apoya'}{!i.activo && ' · sin turnos ni correos'}</span>
+                  </div>
+                  <div className="botones-fila">
+                    <button className="btn suave chico" disabled={ocupado} onClick={() => setEditando({ id: i.id, nombre: i.nombre, correo: i.correo })}>Modificar</button>
+                    <button className="btn suave chico" disabled={ocupado} onClick={() => cambiar(i, { puede_dirigir: !i.puede_dirigir })}>
+                      {i.puede_dirigir ? 'Solo apoya' : 'Puede dirigir'}
+                    </button>
+                    <button className="btn suave chico" disabled={ocupado} onClick={() => pausar(i)}>
+                      {i.activo ? 'Pausar' : 'Reactivar'}
+                    </button>
+                    <button className="btn suave chico" disabled={ocupado} onClick={() => baja(i)}>Borrar</button>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -149,8 +157,6 @@ function Equipo({ canal }) {
             onChange={(e) => setCorreo(e.target.value)} />
         </div>
         <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir el evento</label>
-        <label className="casilla"><input type="checkbox" checked={aviso} onChange={(e) => setAviso(e.target.checked)} required /> Le informé el aviso de privacidad y está de acuerdo</label>
-        <AvisoPrivacidad canal={canal} />
         {error && <p className="error" role="alert">{error}</p>}
         {mensaje && <p className="chico-texto" role="status">{mensaje}</p>}
         <div className="botones">

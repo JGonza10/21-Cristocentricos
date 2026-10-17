@@ -1,8 +1,8 @@
 """Equipo y turnos: /api/equipo/... y /api/turnos/...
 
 Los integrantes no tienen cuenta: solo nombre y correo para mandarles la invitación.
-Antes de guardar a alguien hay que confirmar que se le informó el aviso de privacidad
-(LFPDPPP). Al darlo de baja se borra su correo (derecho de cancelación).
+Se pueden editar, pausar (sin turnos ni correos) o dar de baja. Al darlo de baja se borra su
+correo (derecho de cancelación).
 """
 import re
 from datetime import date, timedelta
@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from flask import Blueprint, abort, current_app, g, jsonify, request
 
 from .extensiones import db
-from .modelos import EventoCalendario, Integrante, Turno, ahora
+from .modelos import EventoCalendario, Integrante, Turno
 from .seguridad import login_requerido
 
 bp = Blueprint("equipo", __name__, url_prefix="/api")
@@ -88,13 +88,10 @@ def listar():
 @login_requerido
 def agregar():
     d = _datos()
-    if d.get("aviso") is not True:
-        raise ErrorEquipo("Confirma que la persona conoce el aviso de privacidad.")
     correo = _correo(d.get("correo"))
     _correo_libre(correo)
     i = Integrante(nombre=_nombre(d.get("nombre")), correo=correo,
-                   puede_dirigir=_booleano(d.get("puede_dirigir", True), "puede dirigir"),
-                   aviso_privacidad=ahora())
+                   puede_dirigir=_booleano(d.get("puede_dirigir", True), "puede dirigir"))
     db.session.add(i)
     db.session.commit()
     current_app.logger.info("Integrante %s agregado por %s", i.id, g.usuario.usuario)

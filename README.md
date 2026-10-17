@@ -156,8 +156,9 @@ Si una grabación falla, se ve en «Grabaciones recientes». Para intentarlo otr
 `flask --app app reels-reintentar nombre-del-archivo.mkv`
 
 ## Equipo y turnos
-En **Ajustes → Equipo** agrega a cada integrante (nombre y correo; de preferencia Gmail). Antes de
-guardarlo hay que confirmar que se le informó el aviso de privacidad. Los domingos a las 6 pm se
+En **Ajustes → Equipo** agrega a cada integrante (nombre y correo; de preferencia Gmail). Cada uno
+se puede **Modificar**, **Pausar** (no recibe turnos, invitaciones ni correos: sirve para hacer pruebas
+sin molestar a nadie) o **Borrar**. Los domingos a las 6 pm se
 reparten solos los lugares vacíos de la semana: le toca a quien lleva menos turnos en los últimos 90
 días. En la pestaña **Evento** puedes cambiar a mano quién dirige y quién apoya.
 
@@ -255,8 +256,8 @@ por PostgreSQL y revisar el checklist de seguridad con Claude antes.
 
 ## Privacidad (LFPDPPP)
 El calendario del equipo guarda nombre y correo de los integrantes, solo para asignar turnos y mandar
-invitaciones. Al agregar a alguien se confirma que se le informó el aviso de privacidad (queda la
-fecha). «Dar de baja» borra su nombre y su correo (derecho de cancelación) y sus turnos futuros.
+invitaciones. Gonza pidió quitar la casilla del aviso de privacidad (2026-10-17): se informa de palabra.
+«Borrar» borra su nombre y su correo (derecho de cancelación) y sus turnos futuros.
 
 ## Licencias de las fuentes
 Spectral, Public Sans y JetBrains Mono (`assets/fuentes/`) son libres (SIL Open Font License);

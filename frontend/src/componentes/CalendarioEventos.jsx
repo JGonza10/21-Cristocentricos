@@ -157,7 +157,6 @@ function EquipoDelMes({ turnos, mes, version, alCambiar }) {
   const [nombre, setNombre] = useState('')
   const [correo, setCorreo] = useState('')
   const [dirige, setDirige] = useState(true)
-  const [aviso, setAviso] = useState(false)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -186,11 +185,10 @@ function EquipoDelMes({ turnos, mes, version, alCambiar }) {
     setError('')
     setMensaje('')
     try {
-      await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige, aviso } })
+      await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige } })
       setMensaje(`${nombre} ya está en el equipo.`)
       setNombre('')
       setCorreo('')
-      setAviso(false)
       alCambiar()
     } catch (err) {
       setError(err.message)
@@ -212,7 +210,7 @@ function EquipoDelMes({ turnos, mes, version, alCambiar }) {
               <li key={i.id}>
                 <span className="cal-av" aria-hidden="true">{i.nombre.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
                 <div>
-                  <b>{i.nombre}</b>
+                  <b>{i.nombre}{!i.activo && <span className="pill gris">en pausa</span>}</b>
                   <span className="chico-texto">
                     {c.dirige} dirige · {c.apoya} apoya este mes{!i.puede_dirigir && ' · solo apoya'}
                   </span>
@@ -234,7 +232,6 @@ function EquipoDelMes({ turnos, mes, version, alCambiar }) {
           <input id="cal-correo" type="email" value={correo} maxLength={120} required autoComplete="off" inputMode="email" onChange={(e) => setCorreo(e.target.value)} />
         </div>
         <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir</label>
-        <label className="casilla"><input type="checkbox" checked={aviso} required onChange={(e) => setAviso(e.target.checked)} /> Le informé el aviso de privacidad (texto completo en Ajustes)</label>
         {error && <p className="error" role="alert">{error}</p>}
         {mensaje && <p className="chico-texto" role="status">{mensaje}</p>}
         <button className="btn chico" type="submit" disabled={ocupado}>Agregar</button>

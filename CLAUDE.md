@@ -133,7 +133,7 @@ con títulos en **Spectral** 700 y texto en Public Sans. Fuentes TTF en `assets/
 - Errores: mensaje amable al usuario, detalle solo en log.
 - **Responsivo desde el primer borrador** (probar a 375px, botones ≥ 44px).
 - **Nunca publicar sin aprobación humana**.
-- Datos de integrantes (nombre, correo) → aviso de privacidad breve (LFPDPPP).
+- Datos de integrantes (nombre, correo) → se informa el aviso de palabra; la casilla de confirmación se quitó a pedido de Gonza (2026-10-17). Integrantes: Modificar, Pausar (sin turnos, invitaciones ni correos) y Borrar.
 - `pytest` para login, aprobación y generación de paquetes. `pip-audit` antes de publicar.
 - `README.md` con instalación, variables de entorno y despliegue.
 
@@ -202,7 +202,7 @@ Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js
 - **Diagrama tipo lienzo** (`componentes/Flujo.jsx` + `styles/lienzo.css`), basado en la guía: se ajusta al ancho (en la tarjeta se ocultan subtítulos y etiquetas); muestra palomita en lo hecho, guion en lo omitido, anillo en el paso actual y flechas recorridas en verde. «Ver cómo funciona» hace el recorrido explicativo de los 11 pasos. Errores en vivo con marca roja.
 - **Ventanas emergentes** (`componentes/Modal.jsx`, `<dialog>` nativo): diagrama en grande, calendario y equipo, y reporte. Atrapan el foco, cierran con Escape o clic afuera y regresan el foco al botón que las abrió.
 - **Guía** bajo el diagrama con el paso actual (Marcar como hecho / Omitir / acción del paso) y aviso cuando un paso se cumple y se pasa al siguiente. Las **tarjetas** son un acordeón: se abre sola la del paso actual.
-- **Calendario en ventana** (`CalendarioEventos.jsx`), desde «Asignar ahora»/«Cambiar» del encabezado y desde el paso 1: muestra quién dirige y quién apoya, botón «Hoy», llenar huecos y el panel del **equipo** (turnos del mes, próximo turno, alta rápida con aviso de privacidad). Ya no hay calendario al pie de Inicio.
+- **Calendario en ventana** (`CalendarioEventos.jsx`), desde «Asignar ahora»/«Cambiar» del encabezado y desde el paso 1: muestra quién dirige y quién apoya, botón «Hoy», llenar huecos y el panel del **equipo** (turnos del mes, próximo turno, alta rápida). Ya no hay calendario al pie de Inicio. **El diagrama del proceso ya no está en Inicio** (2026-10-17): se abre en grande desde el botón «Diagrama» del menú superior.
 - **Reporte semanal automático** (`agentes/reporte.py`, tabla `reportes`, `app/reportes.py`): el worker lo arma **sin IA** los lunes 8 am (semana anterior); también se genera a mano. Trae resumen por evento («resumen del vivo»), equipo, bandeja, redes, seguidores contra `META_SEGUIDORES` (captura manual en la tabla `seguidores`, `PUT /api/seguidores`) y «qué mejorar» con reglas.
 - Estado en vivo en `frontend/src/pasos.js` (`calcularVivo`) desde `/api/estado` (incluye `publicaciones_por_red` y `ultimo_reporte`).
 

@@ -38,7 +38,7 @@ function abrirReloj() {
   window.open('/reloj', 'reloj', 'popup,width=1280,height=720')
 }
 
-export default function Inicio({ ir }) {
+export default function Inicio({ ir, verDiagrama = 0 }) {
   const [ahora, setAhora] = useState(() => new Date())
   const [estado, setEstado] = useState(null)
   const [turnos, setTurnos] = useState({})
@@ -53,6 +53,8 @@ export default function Inicio({ ir }) {
   const [ocupado, setOcupado] = useState(false)
   const [ejemploMsg, setEjemploMsg] = useState('')
   const previo = useRef(null)
+
+  useEffect(() => { if (verDiagrama) setModal('diagrama') }, [verDiagrama])
 
   const cargarAvance = useCallback(() => {
     api(fechaSel ? `/api/avance/${fechaSel}` : '/api/avance/activo').then(setAvance).catch((e) => setError(e.message))
@@ -260,10 +262,8 @@ export default function Inicio({ ir }) {
               </div>
             )}
           </div>
-          <button className="btn suave chico" onClick={() => setModal('diagrama')}>Ver en grande</button>
         </div>
         {barra}
-        <Flujo pasos={pasos} nodosVivo={nodos} avance={estadosAvance} actual={avance?.actual} alElegirPaso={elegirPaso} />
         {mensajes}
         {guia}
       </section>

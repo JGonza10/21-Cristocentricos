@@ -28,6 +28,7 @@ export default function App() {
   const [fechaEvento, setFechaEvento] = useState(null)
   const [tema, setTema] = useState(temaActual)
   const [ideas, setIdeas] = useState(false)
+  const [diagrama, setDiagrama] = useState(0)
 
   useEffect(() => {
     api('/api/auth/yo').then((d) => setUsuario(d.usuario)).catch(() => setUsuario(null))
@@ -68,6 +69,8 @@ export default function App() {
               <button aria-pressed={tema === 'light'} onClick={() => elegirTema('light')}><Sol /><span>Claro</span></button>
               <button aria-pressed={tema === 'dark'} onClick={() => elegirTema('dark')}><Luna /><span>Oscuro</span></button>
             </div>
+            <button className="btn suave chico" onClick={() => { ir('inicio'); setDiagrama((n) => n + 1) }}
+              title="Muestra en grande cómo funciona el proceso del evento">Diagrama</button>
             <button className="btn suave chico" onClick={() => setIdeas(true)} title="Guarda una idea escrita o por voz">Ideas</button>
             <button className="btn suave chico" onClick={salir}>Salir</button>
           </div>
@@ -82,7 +85,7 @@ export default function App() {
       </header>
 
       <main className="envoltura" role="tabpanel">
-        {pestana === 'inicio' && <Inicio ir={ir} />}
+        {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} />}
         {pestana === 'contenido' && <Contenido />}
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}

@@ -52,13 +52,27 @@ def test_todo_requiere_sesion(cliente):
     assert cliente.get("/api/estado").status_code == 401
 
 
-def test_agregar_requiere_aviso_de_privacidad(sesion):
-    r = enviar(sesion, "/api/equipo", {"nombre": "Ana", "correo": "ana@gmail.com"})
-    assert r.status_code == 400 and "privacidad" in r.get_json()["error"]
-    r = agregar(sesion, correo="  ANA@Gmail.com ")
+def test_agregar_sin_casilla_de_aviso(sesion):
+    r = enviar(sesion, "/api/equipo", {"nombre": "Ana", "correo": "  ANA@Gmail.com "})
     assert r.status_code == 201
-    i = r.get_json()["integrante"]
-    assert i["correo"] == "ana@gmail.com" and i["aviso_privacidad"]
+    assert r.get_json()["integrante"]["correo"] == "ana@gmail.com"
+
+
+def test_pausado_no_recibe_turnos_ni_avisos(app, sesion, monkeypatch):
+    from agentes import avisos
+    from app.modelos import Tema
+    iid = agregar(sesion, nombre="Esbeidy", correo="esbeidy@gmail.com").get_json()["integrante"]["id"]
+    agregar(sesion, nombre="Juan", correo="juan@gmail.com")
+    assert enviar(sesion, f"/api/equipo/{iid}", {"activo": False}, "patch").status_code == 200
+    enviados = []
+    monkeypatch.setattr(avisos.google, "configurado", lambda: True)
+    monkeypatch.setattr(avisos.correo, "enviar", lambda para, *a: enviados.append(para))
+    with app.app_context():
+        assert all(t.integrante.nombre == "Juan" for t in turnos.repartir([LUNES]))
+        db.session.add(Tema(fecha=LUNES, titulo="Prueba", aviso_pendiente=True))
+        db.session.commit()
+        avisos.tarea()
+    assert enviados == [["juan@gmail.com"]]
 
 
 @pytest.mark.parametrize("nombre, correo", [
