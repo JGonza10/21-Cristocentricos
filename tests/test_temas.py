@@ -226,3 +226,25 @@ def test_generar_difusion_desde_la_app(app, cliente, monkeypatch):
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").get_json()["creados"] == 2
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").get_json()["creados"] == 0
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion", {"otra": True}).get_json()["creados"] == 2
+
+
+def test_estadisticas_por_periodo(app, cliente):
+    from datetime import date
+
+    from app.modelos import Grabacion, Seguidores
+    login(cliente)
+    with app.app_context():
+        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=date(2026, 10, 16), estado="lista", duracion=3600))
+        db.session.add(Seguidores(fecha=date(2026, 10, 10), red="instagram", cantidad=120))
+        db.session.commit()
+    d = cliente.get("/api/estadisticas?desde=2026-10-01&hasta=2026-10-31").get_json()
+    fechas_ev = [e["fecha"] for e in d["eventos"]]
+    assert "2026-10-02" not in fechas_ev and "2026-10-16" in fechas_ev        # pasado sin actividad no cuenta
+    assert fechas_ev[-1] == "2026-10-30" and d["resumen"]["eventos"] == 1
+    viernes = next(e for e in d["eventos"] if e["fecha"] == "2026-10-16")
+    assert viernes["minutos"] == 60 and viernes["total"] == 13
+    assert d["seguidores"]["instagram"] == [{"fecha": "2026-10-10", "cantidad": 120}]
+    assert len(d["pasos"]) == 13 and set(d["piezas"]) == {"pendiente", "aprobado", "rechazado"}
+    assert cliente.get("/api/estadisticas?desde=2026-10-31&hasta=2026-10-01").status_code == 400
+    assert cliente.get("/api/estadisticas?desde=2020-01-01&hasta=2026-10-01").status_code == 400
+    assert cliente.get("/api/estadisticas?desde=nada").status_code == 400

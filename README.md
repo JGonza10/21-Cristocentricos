@@ -155,6 +155,13 @@ Todo se hace en tu PC, sin pagar ninguna API:
 Si una grabación falla, se ve en «Grabaciones recientes». Para intentarlo otra vez:
 `flask --app app reels-reintentar nombre-del-archivo.mkv`
 
+## Estadísticas
+Pestaña **Estadísticas** (en celular, «Datos»): eliges el periodo (último mes, 3 o 6 meses, este año, 12 meses
+o fechas a mano) y ves gráficas interactivas: avance de cada evento (clic = ficha del evento), piezas por
+evento, estado de las piezas, cómo se cumple cada paso, publicaciones por red, seguidores e ideas por semana.
+Pasa el mouse para ver el detalle y usa la leyenda para prender o apagar series. Solo cuentan los eventos que
+se trabajaron en la app (y los de hoy en adelante). Datos: `GET /api/estadisticas?desde=&hasta=` (hasta 2 años).
+
 ## Eventos pasados y bitácora
 Inicio solo muestra el proceso del evento de hoy y de los próximos. Cada hora, los eventos que ya pasaron
 (y que se trabajaron) se guardan en la bitácora: tema, pasos hechos, video, reels, aprobados y

@@ -7,6 +7,7 @@ import Inicio from './paginas/Inicio.jsx'
 import Contenido from './paginas/Contenido.jsx'
 import Evento from './paginas/Evento.jsx'
 import Configuracion from './paginas/Configuracion.jsx'
+import Estadisticas from './paginas/Estadisticas.jsx'
 import Modal from './componentes/Modal.jsx'
 import Ideas from './componentes/Ideas.jsx'
 
@@ -14,6 +15,7 @@ const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
   { id: 'contenido', nombre: 'Contenido' },
   { id: 'evento', nombre: 'Evento' },
+  { id: 'estadisticas', nombre: 'Estadísticas', corto: 'Datos' },
   { id: 'configuracion', nombre: 'Configuración', corto: 'Ajustes' },
 ]
 
@@ -90,6 +92,7 @@ export default function App() {
         {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} alVerDiagrama={cerrarAvisoDiagrama} />}
         {pestana === 'contenido' && <Contenido />}
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
+        {pestana === 'estadisticas' && <Estadisticas ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}
       </main>
 

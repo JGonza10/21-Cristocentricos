@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
 from . import auth, avance, bandeja, cli, equipo, errores, ideas, panel, reportes, temas
-from . import grabar
+from . import estadisticas, grabar
 from .migracion import migrar
 from .extensiones import csrf, db
 
@@ -85,6 +85,7 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(reportes.bp)
     app.register_blueprint(temas.bp)
     app.register_blueprint(ideas.bp)
+    app.register_blueprint(estadisticas.bp)
     app.register_blueprint(grabar.bp)
     if app.config["EJEMPLO"]:
         from . import ejemplo

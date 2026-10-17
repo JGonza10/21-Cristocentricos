@@ -75,7 +75,7 @@ input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--a
 .cab-fila{max-width:940px;margin-inline:auto;padding:10px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .marca{font-weight:800;font-size:1.05rem;white-space:nowrap}
 .marca small{font-weight:400;font-size:.78rem;color:var(--muted);margin-left:4px}
-@media (max-width:560px){.marca small{display:none}}
+@media (max-width:560px){.marca small{display:none}.cab-fila{flex-wrap:wrap;row-gap:8px}.acciones{flex-wrap:wrap;gap:6px}}
 .acciones{display:flex;align-items:center;gap:8px}
 .tema{display:inline-flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .tema button{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:0;border-radius:11px;cursor:pointer;
