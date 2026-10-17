@@ -9,7 +9,6 @@
     GET    /api/ideas/<id>/audio      el audio original
 """
 import uuid
-from datetime import date
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, g, jsonify, request, send_file

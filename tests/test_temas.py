@@ -1,7 +1,6 @@
 """Tema por evento, revisión técnica, instrucciones para Claude, ideas, subida de video, avisos y OBS."""
 import os
 from datetime import date, datetime
-from pathlib import Path
 
 import pytest
 
