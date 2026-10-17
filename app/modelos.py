@@ -261,6 +261,23 @@ class AvancePaso(db.Model):
     usuario = db.relationship("Usuario")
 
 
+class BitacoraEvento(db.Model):
+    """Foto final de un evento que ya pasó (para estadísticas). Inicio solo muestra el de hoy y los próximos."""
+    __tablename__ = "bitacora_eventos"
+
+    fecha = db.Column(db.Date, primary_key=True)
+    tema = db.Column(db.String(120))
+    hechos = db.Column(db.Integer, nullable=False)
+    total = db.Column(db.Integer, nullable=False)
+    pasos = db.Column(db.JSON, nullable=False)          # {paso: hecho/omitido/pendiente}
+    datos = db.Column(db.JSON, nullable=False)          # difusión, reels, aprobados, publicaciones…
+    archivado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    def a_dict(self) -> dict:
+        return {"fecha": self.fecha.isoformat(), "tema": self.tema or "", "hechos": self.hechos,
+                "total": self.total, "pasos": self.pasos, **self.datos}
+
+
 class Reporte(db.Model):
     """Reporte semanal que arma solo el agente de reportes (lunes 8 am) con los datos del sistema."""
     __tablename__ = "reportes"

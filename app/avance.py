@@ -4,7 +4,7 @@ Cada paso está hecho, omitido (no era necesario) o pendiente. Muchos se comprue
 datos del sistema; los demás se marcan a mano. El paso actual es el primero pendiente: solo ese se
 puede marcar a mano, así no se brinca ninguno.
 
-    GET /api/avance/activo           el evento que toca atender ahora
+    GET /api/avance/activo           el evento de hoy o el próximo (los pasados van a la bitácora)
     GET /api/avance/<fecha>          avance de un evento
     PUT /api/avance/<fecha>/<paso>   {"accion": "hecho" | "omitir" | "deshacer", "nota": "..."}
 """
@@ -13,12 +13,12 @@ from datetime import date, timedelta
 from flask import Blueprint, current_app, g, jsonify, request
 
 from .extensiones import db
-from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, Grabacion, Paquete, Reporte, Tema, Turno
+from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, BitacoraEvento, Grabacion, Paquete, Reporte, Tema, Turno
 from .seguridad import login_requerido
 
 bp = Blueprint("avance", __name__, url_prefix="/api/avance")
 
-DIAS_ATRAS = 10  # un evento sin terminar sigue siendo "el activo" hasta 10 días después
+DIAS_ATRAS = 60  # la bitácora revisa hasta 60 días atrás por si el worker estuvo apagado
 
 # Cómo se cumple cada paso (lo ve la persona en la tarjeta).
 COMO = {
@@ -178,15 +178,37 @@ def _tuvo_actividad(f: date) -> bool:
 
 
 def evento_activo() -> date:
-    """El evento más antiguo de los últimos días que no ha terminado su proceso; si no hay, el próximo."""
+    """El evento de hoy (si hoy hay) o el próximo. Los pasados ya no se muestran: quedan en la bitácora."""
+    from agentes import fechas
+    return fechas.proximos_eventos(fechas.hoy_cdmx(), 7)[0]
+
+
+def archivar(f: date) -> BitacoraEvento:
+    """Guarda (o actualiza) la foto final de un evento pasado para las estadísticas."""
+    from .reportes import _registro
+    a = avance(f)
+    fila = next((r for r in _registro() if r["fecha"] == f.isoformat()), {})
+    datos = {k: v for k, v in fila.items() if k not in ("fecha", "tema")}
+    datos.setdefault("evento", a["nombre"])
+    b = db.session.get(BitacoraEvento, f) or BitacoraEvento(fecha=f)
+    b.tema, b.hechos, b.total = a["tema"], a["hechos"], a["total"]
+    b.pasos, b.datos = {p["id"]: p["estado"] for p in a["pasos"]}, datos
+    db.session.add(b)
+    return b
+
+
+def archivar_pasados() -> int:
+    """Pasa a la bitácora los eventos que ya pasaron y se trabajaron. Devuelve cuántos archivó."""
     from agentes import fechas
     hoy = fechas.hoy_cdmx()
+    n = 0
     for f in fechas.proximos_eventos(hoy - timedelta(DIAS_ATRAS), DIAS_ATRAS):
-        if f < hoy and not _tuvo_actividad(f):
-            continue                      # un evento pasado que nunca se trabajó no estorba
-        if not avance(f)["completo"]:
-            return f
-    return fechas.proximos_eventos(hoy + timedelta(1), 7)[0]
+        if f >= hoy or db.session.get(BitacoraEvento, f) or not _tuvo_actividad(f):
+            continue
+        archivar(f)
+        n += 1
+    db.session.commit()
+    return n
 
 
 @bp.get("/activo")

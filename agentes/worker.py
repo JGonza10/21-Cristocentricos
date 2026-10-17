@@ -80,9 +80,16 @@ def crear_planificador(app) -> BlockingScheduler:
     sched.add_job(trabajo("invitaciones", turnos.sincronizar_invitaciones,
                           lambda n: f"{_plural(n, 'invitación actualizada', 'invitaciones actualizadas')}"),
                   "interval", minutes=10, id="invitaciones", next_run_time=ahora + timedelta(seconds=20))
+    sched.add_job(trabajo("bitacora", _archivar, lambda n: f"{_plural(n, 'evento archivado', 'eventos archivados')}"),
+                  "cron", hour="*", minute=7, id="bitacora", next_run_time=ahora + timedelta(seconds=40))
     sched.add_job(trabajo("reporte", reporte.tarea_semanal, lambda s: f"Reporte de la semana del {s.day}/{s.month} listo"),
                   "cron", day_of_week="mon", hour=8, minute=0, id="reporte")
     return sched
+
+
+def _archivar() -> int:
+    from app.avance import archivar_pasados
+    return archivar_pasados()
 
 
 class AvisoGrabaciones(FileSystemEventHandler):

@@ -59,6 +59,7 @@ export default function ReporteSemanal({ alCambiar }) {
           {datos && <button className="btn suave chico" onClick={() => generar(datos.semana)} disabled={ocupado}>Actualizar esta semana</button>}
           <button className="btn chico" onClick={() => generar()} disabled={ocupado}>Generar la semana actual</button>
           <a className="btn suave chico" href="/api/registro.csv" download>Descargar registro (Excel)</a>
+          <a className="btn suave chico" href="/api/bitacora.csv" download title="Cómo terminó cada evento pasado, para estadísticas">Bitácora de eventos (Excel)</a>
         </div>
       </div>
       <p className="chico-texto">Se arma solo cada lunes a las 8 am con lo que registró el sistema; no hace falta pedírselo a nadie.

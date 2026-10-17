@@ -98,19 +98,27 @@ def test_datos_no_validos(cliente):
     assert enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "hecho", "nota": "x" * 201}, metodo="put").status_code == 400
 
 
-def test_evento_activo_es_el_mas_antiguo_sin_terminar(app, cliente):
+def test_evento_activo_es_hoy_o_el_proximo_y_los_pasados_van_a_la_bitacora(app, cliente):
     login(cliente)
-    d = cliente.get("/api/avance/activo").get_json()
-    assert d["fecha"] == "2026-10-19"           # los pasados sin ninguna actividad no cuentan: va el próximo
     with app.app_context():
-        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=date(2026, 10, 9), estado="lista"))
+        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=VIERNES, estado="lista"))
         db.session.commit()
     d = cliente.get("/api/avance/activo").get_json()
-    assert d["fecha"] == "2026-10-09"           # el viernes de hace 8 días se trabajó y sigue sin terminar
+    assert d["fecha"] == "2026-10-19"           # el viernes ya pasó: aunque se trabajó, ya no es el activo
+    with app.app_context():
+        from app.avance import archivar_pasados
+        assert archivar_pasados() == 1          # solo el viernes (los otros pasados no tuvieron actividad)
+        assert archivar_pasados() == 0          # no se repite
+    b = cliente.get("/api/bitacora").get_json()["bitacora"]
+    assert [x["fecha"] for x in b] == ["2026-10-16"] and b[0]["video"] == "vivo.mkv"
+    assert b[0]["total"] == 13 and b[0]["pasos"]["grabacion"] in ("hecho", "pendiente")
+    csv = cliente.get("/api/bitacora.csv")
+    assert csv.status_code == 200 and "paso_tema" in csv.get_data(as_text=True)
 
 
 def test_sin_sesion(cliente):
     assert cliente.get("/api/avance/activo").status_code == 401
+    assert cliente.get("/api/bitacora.csv").status_code == 401
     assert cliente.get("/api/reportes").status_code == 401
 
 

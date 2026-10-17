@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { claveFecha, esDiaDeEvento, nombreFecha, proximoEvento } from '../evento.js'
+import { ahoraCDMX, claveFecha, esDiaDeEvento, nombreFecha, proximoEvento } from '../evento.js'
 import { fechaDeClave, fechaHora, nombres } from '../util.js'
 import { AVANCE, calcularVivo, ESTADOS, QUIEN } from '../pasos.js'
 import Flujo from '../componentes/Flujo.jsx'
@@ -257,7 +257,9 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
             <span className="etiqueta">Proceso del evento</span>
             {avance && (
               <div className="evento-nav">
-                <button className="btn suave chico" onClick={() => cambiarEvento(-1)} aria-label="Evento anterior">‹</button>
+                <button className="btn suave chico" onClick={() => cambiarEvento(-1)} aria-label="Evento anterior"
+                  disabled={eventoVecino(avance.fecha, -1) < claveFecha(ahoraCDMX())}
+                  title="Los eventos pasados ya no se muestran: quedan en la bitácora del reporte semanal">‹</button>
                 <b aria-live="polite">{avance.nombre}{avance.tema && <span className="evento-tema"> · {avance.tema}</span>}</b>
                 <button className="btn suave chico" onClick={() => cambiarEvento(1)} aria-label="Evento siguiente">›</button>
                 {fechaSel && <button className="enlace" onClick={() => { setFechaSel(null); previo.current = null }}>Ir al que toca</button>}

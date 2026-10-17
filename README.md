@@ -155,6 +155,11 @@ Todo se hace en tu PC, sin pagar ninguna API:
 Si una grabación falla, se ve en «Grabaciones recientes». Para intentarlo otra vez:
 `flask --app app reels-reintentar nombre-del-archivo.mkv`
 
+## Eventos pasados y bitácora
+Inicio solo muestra el proceso del evento de hoy y de los próximos. Cada hora, los eventos que ya pasaron
+(y que se trabajaron) se guardan en la bitácora: tema, pasos hechos, video, reels, aprobados y
+publicaciones por red. Se descarga para Excel desde el reporte semanal: **Bitácora de eventos (Excel)**.
+
 ## Equipo y turnos
 En **Ajustes → Equipo** agrega a cada integrante (nombre y correo; de preferencia Gmail). Cada uno
 se puede **Modificar**, **Pausar** (no recibe turnos, invitaciones ni correos: sirve para hacer pruebas

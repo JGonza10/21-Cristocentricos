@@ -6,6 +6,7 @@
     GET  /api/seguidores               último conteo por red
     PUT  /api/seguidores               {"instagram": 120, "facebook": 300, ...} con fecha de hoy
     GET  /api/registro[.csv]           registro de cada evento (sustituye a la hoja de Google Sheets)
+    GET  /api/bitacora[.csv]           foto final de cada evento pasado, para estadísticas
 """
 from datetime import date
 
@@ -145,3 +146,35 @@ def registro_csv():
         w.writerow({k: ("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for k, v in f.items()})
     return current_app.response_class("\ufeff" + buf.getvalue(), mimetype="text/csv",
                                       headers={"Content-Disposition": "attachment; filename=registro-eventos.csv"})
+
+
+def _seguro(v):
+    # Texto que empiece con = + - @ se abriría como fórmula en Excel: se le antepone un apóstrofo.
+    return "'" + v if isinstance(v, str) and v[:1] in "=+-@" else v
+
+
+@bp.get("/bitacora")
+@login_requerido
+def bitacora():
+    from .modelos import BitacoraEvento
+    return jsonify(bitacora=[b.a_dict() for b in BitacoraEvento.query.order_by(BitacoraEvento.fecha.desc())])
+
+
+@bp.get("/bitacora.csv")
+@login_requerido
+def bitacora_csv():
+    import csv
+    import io
+
+    from .modelos import PASOS_EVENTO, BitacoraEvento
+    buf = io.StringIO()
+    columnas = ["fecha", "evento", "tema", "hechos", "total", "video", "minutos", "difusion", "reels", "carrusel",
+                "aprobados", "rechazados", *REDES, *[f"paso_{p}" for p in PASOS_EVENTO]]
+    w = csv.DictWriter(buf, fieldnames=columnas, extrasaction="ignore")
+    w.writeheader()
+    for b in BitacoraEvento.query.order_by(BitacoraEvento.fecha.desc()):
+        d = b.a_dict()
+        d.update({f"paso_{p}": e for p, e in d.pop("pasos").items()})
+        w.writerow({k: _seguro(v) for k, v in d.items()})
+    return current_app.response_class("﻿" + buf.getvalue(), mimetype="text/csv",
+                                      headers={"Content-Disposition": "attachment; filename=bitacora-eventos.csv"})

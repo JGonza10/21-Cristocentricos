@@ -21,6 +21,7 @@ AGENTES = {
     "avisos": "Avisos del tema",
     "ideas": "Ideas por voz",
     "grabacion": "Grabación con OBS",
+    "bitacora": "Bitácora de eventos",
 }
 LATIDO_MAX = timedelta(minutes=3)
 
