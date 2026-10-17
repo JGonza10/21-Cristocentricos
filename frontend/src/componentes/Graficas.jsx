@@ -1,6 +1,6 @@
 // Gráficas interactivas en SVG, sin librerías: toman los colores del tema (claro/oscuro) por CSS,
 // muestran el detalle al pasar el mouse o tocar, y la leyenda prende y apaga cada serie.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 const H = 240
 const M = { arriba: 14, derecha: 12, abajo: 34, izquierda: 38 }
@@ -29,6 +29,21 @@ function escala(max) {
   return { tope, marcas: [0, 1, 2, 3, 4].map((k) => +(k * p).toFixed(2)) }
 }
 
+/** Degradado vertical por serie: del color principal (arriba) a su segundo tono (abajo). */
+function Degradados({ id, series, area = false }) {
+  return (
+    <defs>
+      {series.map((s) => (
+        <linearGradient key={s.clave} id={`${id}-${s.clave}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" style={{ stopColor: s.color, stopOpacity: area ? 0.35 : 1 }} />
+          <stop offset="100%" style={{ stopColor: s.color2 ?? s.color, stopOpacity: area ? 0 : 0.85 }} />
+        </linearGradient>
+      ))}
+    </defs>
+  )
+}
+const relleno = (id, s) => `url(#${CSS.escape(id)}-${s.clave})`
+
 const fmt = (n) => (Number.isInteger(n) ? n.toLocaleString('es-MX') : n.toLocaleString('es-MX', { maximumFractionDigits: 1 }))
 
 function Leyenda({ series, apagadas, alternar }) {
@@ -38,7 +53,7 @@ function Leyenda({ series, apagadas, alternar }) {
       {series.map((s) => (
         <button key={s.clave} type="button" aria-pressed={!apagadas.has(s.clave)} onClick={() => alternar(s.clave)}
           title={apagadas.has(s.clave) ? 'Mostrar' : 'Ocultar'}>
-          <span className="g-punto" style={{ background: s.color }} />{s.nombre}
+          <span className="g-punto" style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color2 ?? s.color})` }} />{s.nombre}
         </button>
       ))}
     </div>
@@ -94,6 +109,7 @@ function Ejes({ marcas, tope, etiquetas, W }) {
  * titulo(d) → título del tooltip, alElegir(d) al hacer clic, elegido: índice resaltado.
  */
 export function Barras({ datos, series, etiqueta, titulo, apilar = true, alElegir, elegido, sufijo = '' }) {
+  const id = useId()
   const [apagadas, alternar] = useSeries()
   const [info, setInfo] = useState(null)
   const [caja, W] = useAncho()
@@ -123,6 +139,7 @@ export function Barras({ datos, series, etiqueta, titulo, apilar = true, alElegi
       <Leyenda series={series} apagadas={apagadas} alternar={alternar} />
       <div className="g-lienzo" ref={caja} onMouseLeave={() => setInfo(null)}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Gráfica de barras">
+          <Degradados id={id} series={series} />
           <Ejes W={W} marcas={marcas} tope={tope}
             etiquetas={datos.map((d, i) => ({ x: M.izquierda + banda * (i + 0.5), texto: etiqueta(d) }))} />
           {datos.map((d, i) => {
@@ -140,9 +157,9 @@ export function Barras({ datos, series, etiqueta, titulo, apilar = true, alElegi
                   const h = y(valor(d, s))
                   if (apilar) {
                     base -= h
-                    return <rect key={s.clave} x={x0} y={base} width={anchoBarra} height={h} rx={h > 3 ? 3 : 0} style={{ fill: s.color }} />
+                    return <rect key={s.clave} x={x0} y={base} width={anchoBarra} height={h} rx={h > 6 ? 6 : 0} className="g-barra" style={{ fill: relleno(id, s) }} />
                   }
-                  return <rect key={s.clave} x={x0 + sub * k} y={M.arriba + ALTO - h} width={Math.max(1, sub - 1)} height={h} rx={h > 3 ? 2 : 0} style={{ fill: s.color }} />
+                  return <rect key={s.clave} x={x0 + sub * k} y={M.arriba + ALTO - h} width={Math.max(1, sub - 1)} height={h} rx={h > 4 ? 4 : 0} className="g-barra" style={{ fill: relleno(id, s) }} />
                 })}
               </g>
             )
@@ -156,6 +173,7 @@ export function Barras({ datos, series, etiqueta, titulo, apilar = true, alElegi
 
 /** Líneas en el tiempo. series: [{clave, nombre, color, puntos: [{fecha:'AAAA-MM-DD', y}]}] */
 export function Lineas({ series, desde, hasta, etiquetaFecha }) {
+  const id = useId()
   const [apagadas, alternar] = useSeries()
   const [info, setInfo] = useState(null)
   const ref = useRef(null)
@@ -192,12 +210,20 @@ export function Lineas({ series, desde, hasta, etiquetaFecha }) {
       <div className="g-lienzo" ref={caja} onMouseLeave={() => setInfo(null)}>
         <svg viewBox={`0 0 ${W} ${H}`} ref={ref} onMouseMove={mover} onTouchStart={(e) => mover(e.touches[0])}
           role="img" aria-label="Gráfica de líneas">
+          <Degradados id={id} series={series} area />
           <Ejes W={W} marcas={marcas} tope={tope} etiquetas={etiquetas} />
           {info && <line x1={info.guia} x2={info.guia} y1={M.arriba} y2={M.arriba + ALTO} className="g-guia" />}
           {visibles.map((s) => (
             <g key={s.clave}>
+              {s.puntos.length > 1 && (
+                <polygon className="g-area" style={{ fill: relleno(id, s) }} points={[
+                  `${x(s.puntos[0].fecha)},${M.arriba + ALTO}`,
+                  ...s.puntos.map((p) => `${x(p.fecha)},${y(p.y)}`),
+                  `${x(s.puntos.at(-1).fecha)},${M.arriba + ALTO}`,
+                ].join(' ')} />
+              )}
               <polyline points={s.puntos.map((p) => `${x(p.fecha)},${y(p.y)}`).join(' ')} className="g-linea" style={{ stroke: s.color }} />
-              {s.puntos.map((p) => <circle key={p.fecha} cx={x(p.fecha)} cy={y(p.y)} r={3.5} style={{ fill: s.color }} />)}
+              {s.puntos.map((p) => <circle key={p.fecha} cx={x(p.fecha)} cy={y(p.y)} r={4.5} className="g-nodo" style={{ stroke: s.color }} />)}
             </g>
           ))}
         </svg>

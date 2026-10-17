@@ -12,7 +12,15 @@ const PASO_CORTO = {
   grabacion: 'Grabación', reels: 'Reels', carrusel: 'Carrusel', bandeja: 'Bandeja', publicacion: 'Publicación',
   redes: 'Redes', registro: 'Registro', mides: 'Reporte',
 }
-const COLOR_RED = { instagram: '#c13584', facebook: '#1877f2', tiktok: '#14b8a6', youtube: '#e11d48' }
+// Paleta de las gráficas: tonos vivos con un segundo tono para el degradado (ver estadisticas.css).
+const C = {
+  violeta: ['var(--g-violeta)', 'var(--g-violeta-2)'], rosa: ['var(--g-rosa)', 'var(--g-rosa-2)'],
+  cian: ['var(--g-cian)', 'var(--g-cian-2)'], verde: ['var(--g-verde)', 'var(--g-verde-2)'],
+  coral: ['var(--g-coral)', 'var(--g-coral-2)'], ambar: ['var(--g-ambar)', 'var(--g-ambar-2)'],
+  azul: ['var(--g-azul)', 'var(--g-azul-2)'],
+}
+const serie = (clave, nombre, [color, color2]) => ({ clave, nombre, color, color2 })
+const COLOR_RED = { instagram: C.rosa, facebook: C.azul, tiktok: C.cian, youtube: C.coral }
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 const hoy = () => claveFecha(ahoraCDMX())
@@ -100,7 +108,7 @@ export default function Estadisticas({ ir }) {
             <p className="chico-texto">Pasos completados de 13. Haz clic en un evento para ver su ficha. Solo cuentan los eventos que se trabajaron en la app.</p>
             <Barras datos={conDatos} etiqueta={(e) => fechaCorta(fechaDeClave(e.fecha))}
               titulo={(e) => `${nombreFecha(fechaDeClave(e.fecha))}${e.tema ? ` · ${e.tema}` : ''}`}
-              series={[{ clave: 'hechos', nombre: 'Pasos hechos', color: 'var(--accent)' }]}
+              series={[serie('hechos', 'Pasos hechos', C.violeta)]}
               alElegir={(_, i) => setElegido(i === elegido ? null : i)} elegido={elegido} />
             {ev && <Ficha e={ev} ir={ir} alCerrar={() => setElegido(null)} />}
           </section>
@@ -110,10 +118,10 @@ export default function Estadisticas({ ir }) {
             <Barras datos={conDatos} etiqueta={(e) => fechaCorta(fechaDeClave(e.fecha))}
               titulo={(e) => nombreFecha(fechaDeClave(e.fecha))} apilar={false}
               series={[
-                { clave: 'difusion', nombre: 'Difusión', color: 'var(--activo)' },
-                { clave: 'reels', nombre: 'Reels', color: 'var(--accent)' },
-                { clave: 'aprobados', nombre: 'Aprobadas', color: 'var(--ok)' },
-                { clave: 'rechazados', nombre: 'Rechazadas', color: 'var(--err)' },
+                serie('difusion', 'Difusión', C.cian),
+                serie('reels', 'Reels', C.violeta),
+                serie('aprobados', 'Aprobadas', C.verde),
+                serie('rechazados', 'Rechazadas', C.coral),
               ]}
               alElegir={(_, i) => setElegido(i)} elegido={elegido} />
           </section>
@@ -121,16 +129,16 @@ export default function Estadisticas({ ir }) {
           <section className="tarjeta">
             <h3>Estado de las piezas</h3>
             <Dona partes={[
-              { clave: 'pendiente', nombre: 'Por revisar', valor: datos.piezas.pendiente, color: 'var(--warn)' },
-              { clave: 'aprobado', nombre: 'Aprobadas', valor: datos.piezas.aprobado, color: 'var(--ok)' },
-              { clave: 'rechazado', nombre: 'Rechazadas', valor: datos.piezas.rechazado, color: 'var(--err)' },
+              { clave: 'pendiente', nombre: 'Por revisar', valor: datos.piezas.pendiente, color: C.ambar[0] },
+              { clave: 'aprobado', nombre: 'Aprobadas', valor: datos.piezas.aprobado, color: C.verde[0] },
+              { clave: 'rechazado', nombre: 'Rechazadas', valor: datos.piezas.rechazado, color: C.coral[0] },
             ]} alElegir={(k) => k && ir?.('contenido')} />
             <p className="chico-texto">Clic en una parte para ir a Contenido.</p>
           </section>
 
           <section className="tarjeta">
             <h3>Cómo se cumple cada paso</h3>
-            <p className="chico-texto"><span className="g-punto" style={{ background: 'var(--ok)' }} />hecho <span className="g-punto" style={{ background: 'var(--off)' }} />omitido</p>
+            <p className="chico-texto"><span className="g-punto g-punto-hecho" />hecho <span className="g-punto g-punto-omitido" />omitido</p>
             <Porcentajes filas={datos.pasos.map((p) => ({ clave: p.id, nombre: PASO_CORTO[p.id], ...p }))} />
           </section>
 
@@ -138,7 +146,7 @@ export default function Estadisticas({ ir }) {
             <h3>Publicaciones por red</h3>
             <Barras datos={conDatos} etiqueta={(e) => fechaCorta(fechaDeClave(e.fecha))}
               titulo={(e) => nombreFecha(fechaDeClave(e.fecha))}
-              series={Object.entries(REDES).map(([k, n]) => ({ clave: k, nombre: n, color: COLOR_RED[k] }))}
+              series={Object.entries(REDES).map(([k, n]) => serie(k, n, COLOR_RED[k]))}
               alElegir={(_, i) => setElegido(i)} elegido={elegido} />
           </section>
 
@@ -147,14 +155,14 @@ export default function Estadisticas({ ir }) {
             <p className="chico-texto">Se capturan a mano en el Reporte semanal (Inicio → Reporte semanal).</p>
             <Lineas desde={datos.desde} hasta={datos.hasta} etiquetaFecha={etiquetaFecha}
               series={Object.entries(REDES).map(([k, n]) => ({
-                clave: k, nombre: n, color: COLOR_RED[k], puntos: datos.seguidores[k].map((p) => ({ fecha: p.fecha, y: p.cantidad })),
+                ...serie(k, n, COLOR_RED[k]), puntos: datos.seguidores[k].map((p) => ({ fecha: p.fecha, y: p.cantidad })),
               }))} />
           </section>
 
           <section className="tarjeta est-ancha">
             <h3>Ideas por semana</h3>
             <Barras datos={datos.ideas} etiqueta={(s) => etiquetaFecha(s.semana)} titulo={(s) => `Semana del ${etiquetaFecha(s.semana)}`}
-              series={[{ clave: 'ideas', nombre: 'Ideas', color: 'var(--accent)' }]} />
+              series={[serie('ideas', 'Ideas', C.ambar)]} />
           </section>
         </div>
       )}

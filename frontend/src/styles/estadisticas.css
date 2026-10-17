@@ -1,4 +1,23 @@
-/* Dashboard de estadísticas y gráficas SVG (Graficas.jsx). Los colores vienen de tokens.css. */
+/* Dashboard de estadísticas y gráficas SVG (Graficas.jsx). Paleta propia, viva y sin cafés;
+   cada color tiene un segundo tono para el degradado. En oscuro se aclaran un poco. */
+:root{
+  --g-violeta:#8b5cf6; --g-violeta-2:#d946ef; --g-rosa:#ec4899; --g-rosa-2:#f9a8d4;
+  --g-cian:#06b6d4; --g-cian-2:#67e8f9; --g-verde:#10b981; --g-verde-2:#6ee7b7;
+  --g-coral:#f43f5e; --g-coral-2:#fda4af; --g-ambar:#fbbf24; --g-ambar-2:#fde68a;
+  --g-azul:#3b82f6; --g-azul-2:#93c5fd; --g-gris:#cbd5e1;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --g-violeta:#a78bfa; --g-violeta-2:#e879f9; --g-rosa:#f472b6; --g-rosa-2:#fbcfe8;
+  --g-cian:#22d3ee; --g-cian-2:#a5f3fc; --g-verde:#34d399; --g-verde-2:#a7f3d0;
+  --g-coral:#fb7185; --g-coral-2:#fecdd3; --g-ambar:#fcd34d; --g-ambar-2:#fef3c7;
+  --g-azul:#60a5fa; --g-azul-2:#bfdbfe; --g-gris:#475569;
+}}
+:root[data-theme="dark"]{
+  --g-violeta:#a78bfa; --g-violeta-2:#e879f9; --g-rosa:#f472b6; --g-rosa-2:#fbcfe8;
+  --g-cian:#22d3ee; --g-cian-2:#a5f3fc; --g-verde:#34d399; --g-verde-2:#a7f3d0;
+  --g-coral:#fb7185; --g-coral-2:#fecdd3; --g-ambar:#fcd34d; --g-ambar-2:#fef3c7;
+  --g-azul:#60a5fa; --g-azul-2:#bfdbfe; --g-gris:#475569;
+}
 .est-filtros{display:grid;gap:12px}
 .est-periodos{display:flex;flex-wrap:wrap;gap:8px}
 .chip{min-height:38px;padding:0 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);
@@ -30,8 +49,7 @@
 .g-grupo{cursor:pointer;outline:none}
 .g-grupo:hover .g-zona,.g-grupo:focus-visible .g-zona{fill:var(--accent-soft);opacity:.6}
 .g-grupo.elegido .g-zona{fill:var(--accent-soft)}
-.g-grupo rect:not(.g-zona){transition:height .25s,y .25s}
-.g-linea{fill:none;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.g-linea{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
 .g-guia{stroke:var(--muted-2);stroke-dasharray:3 3}
 .g-tooltip{position:absolute;transform:translateX(-50%);pointer-events:none;background:var(--surface);border:1px solid var(--line);
   border-radius:10px;padding:8px 10px;box-shadow:0 6px 20px rgba(36,27,49,.14);display:grid;gap:2px;font-size:.82rem;
@@ -59,7 +77,14 @@
   border-radius:8px;padding:2px 4px}
 .g-porcentajes li.sobre{background:var(--accent-soft)}
 .g-p-nombre{color:var(--ink-2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.g-p-pista{display:flex;height:12px;border-radius:6px;background:var(--line);overflow:hidden}
-.g-p-hecho{background:var(--ok);transition:width .3s}
-.g-p-omitido{background:var(--off);transition:width .3s}
+.g-p-pista{display:flex;height:12px;border-radius:999px;background:var(--line);overflow:hidden}
+.g-p-hecho{background:linear-gradient(90deg,var(--g-verde),var(--g-cian));transition:width .3s}
+.g-p-omitido{background:var(--g-gris);transition:width .3s}
 .g-p-num{text-align:right;font-weight:700;color:var(--ink)}
+.g-punto-hecho{background:linear-gradient(135deg,var(--g-verde),var(--g-cian))}
+.g-punto-omitido{background:var(--g-gris)}
+.g-barra{transition:height .25s,y .25s,filter .15s}
+.g-grupo:hover .g-barra,.g-grupo.elegido .g-barra{filter:brightness(1.08) drop-shadow(0 3px 6px rgba(139,92,246,.35))}
+.g-area{pointer-events:none}
+.g-nodo{fill:var(--surface);stroke-width:2.5}
+.g-dona-parte:hover,.g-dona-parte.activa{filter:drop-shadow(0 2px 6px rgba(36,27,49,.25))}
