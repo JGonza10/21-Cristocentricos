@@ -25,3 +25,6 @@ frontend/dist/
 # Sistema
 Thumbs.db
 .DS_Store
+
+# Videos para pruebas manuales
+video de prueba/
