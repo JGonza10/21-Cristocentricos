@@ -238,7 +238,8 @@ class EstadoAgente(db.Model):
 
 # --- Avance guiado por evento, reporte semanal y seguidores ------------------------
 
-PASOS_EVENTO = ("turnos", "prepara", "vivo", "grabacion", "reels", "carrusel",
+# Orden del proceso de cada evento (documento "Lo que necesito", Gonza 2026-10-17).
+PASOS_EVENTO = ("tema", "turnos", "difusion", "revision", "vivo", "grabacion", "reels", "carrusel",
                 "bandeja", "publicacion", "redes", "registro", "mides")
 
 
@@ -278,3 +279,68 @@ class Seguidores(db.Model):
     fecha = db.Column(db.Date, nullable=False, index=True)
     red = db.Column(db.String(20), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
+
+
+# --- Tema de cada evento, revisión técnica e ideas ---------------------------------
+
+# Revisión técnica del día del evento (la marca Juan antes de transmitir).
+CHECKLIST = (
+    ("audio", "Micrófono y audio se escuchan bien"),
+    ("camara", "Cámara encuadrada y con buena luz"),
+    ("internet", "Internet estable"),
+    ("streamyard", "StreamYard abierto con el título del evento"),
+    ("obs", "OBS abierto (la app empieza a grabar sola)"),
+    ("guion", "Guion e intenciones a la mano"),
+    ("reloj", "Reloj del evento listo"),
+)
+
+
+class Tema(db.Model):
+    """Tema, guion e intenciones de un evento. Se llena con anticipación desde el calendario."""
+    __tablename__ = "temas"
+
+    fecha = db.Column(db.Date, primary_key=True)
+    titulo = db.Column(db.String(120), nullable=False)
+    descripcion = db.Column(db.String(400), nullable=False, default="")   # 1 o 2 frases para la difusión
+    cita = db.Column(db.String(200), nullable=False, default="")          # cita bíblica opcional
+    guion = db.Column(db.Text, nullable=False, default="")
+    intenciones = db.Column(db.Text, nullable=False, default="")
+    notas = db.Column(db.Text, nullable=False, default="")
+    checklist = db.Column(db.JSON)                                         # {"audio": true, ...}
+    aviso_pendiente = db.Column(db.Boolean, nullable=False, default=False)  # avisar al equipo por correo
+    aviso_error = db.Column(db.String(300))
+    actualizado = db.Column(db.DateTime, default=ahora, nullable=False)
+    actualizado_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+
+    actualizado_por = db.relationship("Usuario")
+
+    def a_dict(self) -> dict:
+        marcas = dict(self.checklist or {})
+        return {
+            "fecha": self.fecha.isoformat(), "titulo": self.titulo, "descripcion": self.descripcion,
+            "cita": self.cita, "guion": self.guion, "intenciones": self.intenciones, "notas": self.notas,
+            "checklist": [{"id": k, "texto": t, "hecho": bool(marcas.get(k))} for k, t in CHECKLIST],
+            "aviso_pendiente": self.aviso_pendiente, "aviso_error": self.aviso_error,
+            "actualizado": _iso(self.actualizado),
+            "actualizado_por": self.actualizado_por.nombre if self.actualizado_por else None,
+        }
+
+
+class Idea(db.Model):
+    """Idea creativa capturada por escrito o por audio (el audio lo transcribe Whisper en esta PC)."""
+    __tablename__ = "ideas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    texto = db.Column(db.Text, nullable=False, default="")
+    audio = db.Column(db.String(120))           # nombre del archivo en datos/ideas/
+    estado = db.Column(db.String(20), nullable=False, default="lista")  # lista / transcribiendo / error / usada
+    fecha_evento = db.Column(db.Date)           # si se convirtió en el tema de un evento
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    usuario = db.relationship("Usuario")
+
+    def a_dict(self) -> dict:
+        return {"id": self.id, "texto": self.texto, "audio": bool(self.audio), "estado": self.estado,
+                "fecha_evento": self.fecha_evento.isoformat() if self.fecha_evento else None,
+                "autor": self.usuario.nombre if self.usuario else None, "creado": _iso(self.creado)}

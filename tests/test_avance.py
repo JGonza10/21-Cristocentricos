@@ -25,56 +25,69 @@ def pasos(d):
     return {p["id"]: p["estado"] for p in d["pasos"]}
 
 
-def test_evento_nuevo_empieza_en_turnos(cliente):
+def test_evento_nuevo_empieza_en_el_tema(cliente):
     login(cliente)
     d = cliente.get(f"/api/avance/{VIERNES}").get_json()
-    assert d["actual"] == "turnos" and d["total"] == 11
+    assert d["actual"] == "tema" and d["total"] == 13 and d["tema"] is None
     assert pasos(d)["vivo"] == "hecho"          # el horario ya pasó: se marca solo
 
 
 def test_pasos_automaticos_con_datos_del_sistema(app, cliente):
     login(cliente)
     with app.app_context():
+        from app.modelos import CHECKLIST, Tema
         ana = Integrante(nombre="Ana", correo="ana@gmail.com")
         db.session.add(ana)
+        db.session.add(Tema(fecha=VIERNES, titulo="La misericordia", guion="Bienvenida…"))
         db.session.commit()
         db.session.add(Turno(fecha=VIERNES, rol="dirige", integrante_id=ana.id))
         db.session.add(Grabacion(nombre="evento.mkv", fecha_evento=VIERNES, estado="lista"))
+        crear_paquete("carrusel", VIERNES, "Difusión", datos={"momento": "antes"})
         reel_id = crear_paquete("reel", VIERNES, "Reel 1").id
-        crear_paquete("carrusel", VIERNES, "Invitación")
+        crear_paquete("carrusel", VIERNES, "Escenas", datos={"momento": "despues"})
         db.session.commit()
     d = cliente.get(f"/api/avance/{VIERNES}").get_json()
     p = pasos(d)
-    assert p["turnos"] == p["grabacion"] == p["reels"] == p["carrusel"] == "hecho"
-    assert p["bandeja"] == "pendiente"
-    assert d["actual"] == "prepara"             # el único que solo se marca a mano va primero
+    assert d["tema"] == "La misericordia"
+    assert p["tema"] == p["turnos"] == p["grabacion"] == p["reels"] == p["carrusel"] == "hecho"
+    assert p["difusion"] == p["bandeja"] == p["revision"] == "pendiente"
+    assert d["actual"] == "difusion"
     with app.app_context():
         from app.modelos import Paquete
         for x in Paquete.query.all():
             x.estado = "aprobado" if x.id == reel_id else "rechazado"
         db.session.add(Publicacion(paquete_id=reel_id, red="tiktok", estado="listo_manual"))
+        t = db.session.get(Tema, VIERNES)
+        t.checklist = {k: True for k, _ in CHECKLIST}
+        db.session.commit()
+    d = cliente.get(f"/api/avance/{VIERNES}").get_json()
+    p = pasos(d)
+    assert p["difusion"] == p["revision"] == p["bandeja"] == p["publicacion"] == "hecho"
+    assert p["redes"] == p["registro"] == "pendiente" and d["actual"] == "redes"
+    with app.app_context():
+        Publicacion.query.first().estado = "publicado"
         db.session.commit()
     p = pasos(cliente.get(f"/api/avance/{VIERNES}").get_json())
-    assert p["bandeja"] == "hecho" and p["publicacion"] == "hecho" and p["redes"] == "pendiente"
+    assert p["redes"] == p["registro"] == "hecho"
 
 
 def test_no_se_puede_brincar_un_paso(cliente):
     login(cliente)
-    r = enviar(cliente, f"/api/avance/{VIERNES}/prepara", {"accion": "hecho"}, metodo="put")
+    r = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "hecho"}, metodo="put")
     assert r.status_code == 409 and "no se brinca" in r.get_json()["error"]
 
 
 def test_marcar_omitir_y_deshacer(cliente):
     login(cliente)
-    r = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "omitir", "nota": "Sin equipo aún"}, metodo="put")
+    r = enviar(cliente, f"/api/avance/{VIERNES}/tema", {"accion": "omitir", "nota": "Sin tema aún"}, metodo="put")
     d = r.get_json()
-    assert r.status_code == 200 and pasos(d)["turnos"] == "omitido" and d["actual"] == "prepara"
-    turnos = next(p for p in d["pasos"] if p["id"] == "turnos")
-    assert turnos["manual"] and turnos["detalle"] == "Sin equipo aún" and turnos["quien"] == "Gonza"
-    d = enviar(cliente, f"/api/avance/{VIERNES}/prepara", {"accion": "hecho"}, metodo="put").get_json()
-    assert d["actual"] == "grabacion"
-    d = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "deshacer"}, metodo="put").get_json()
-    assert d["actual"] == "turnos"
+    assert r.status_code == 200 and pasos(d)["tema"] == "omitido" and d["actual"] == "turnos"
+    tema = next(p for p in d["pasos"] if p["id"] == "tema")
+    assert tema["manual"] and tema["detalle"] == "Sin tema aún" and tema["quien"] == "Gonza"
+    d = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "hecho"}, metodo="put").get_json()
+    assert d["actual"] == "difusion"
+    d = enviar(cliente, f"/api/avance/{VIERNES}/tema", {"accion": "deshacer"}, metodo="put").get_json()
+    assert d["actual"] == "tema"
 
 
 def test_datos_no_validos(cliente):
@@ -118,7 +131,7 @@ def test_reporte_semanal_con_datos_y_que_mejorar(app, cliente):
     textos = " ".join(datos["mejorar"])
     assert "lunes 12 de octubre no tuvo a nadie" in textos and "TikTok: 1 publicación falló" in textos
     assert "Captura los seguidores" in textos
-    # El paso 11 de ese evento queda hecho y el reporte aparece en la lista
+    # El último paso de ese evento queda hecho y el reporte aparece en la lista
     assert pasos(cliente.get(f"/api/avance/{VIERNES}").get_json())["mides"] == "hecho"
     assert cliente.get("/api/reportes").get_json()["reportes"][0]["semana"] == "2026-10-12"
     assert cliente.get("/api/reportes/2026-10-12").status_code == 200

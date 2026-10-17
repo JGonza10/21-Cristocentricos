@@ -98,6 +98,21 @@ def registrar(app):
         nuevos = repartir_turnos(proximos_eventos(hoy_cdmx(), 14))
         click.echo(f"{len(nuevos)} turnos asignados.")
 
+    @app.cli.command("obs-configurar")
+    def obs_configurar():
+        """Activa el control de OBS desde la app (websocket con contraseña nueva en el .env)."""
+        from pathlib import Path
+
+        from servicios import obs
+        if not obs.instalado():
+            raise click.ClickException("OBS no está instalado. Instálalo con: winget install OBSProject.OBSStudio")
+        password = obs.configurar()
+        env = Path(current_app.root_path).parent / ".env"
+        lineas = [x for x in env.read_text(encoding="utf-8").splitlines() if not x.startswith("OBS_PASSWORD=")]
+        lineas.append(f"OBS_PASSWORD={password}")
+        env.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+        click.echo("Listo: OBS acepta órdenes de la app. Cierra y vuelve a abrir OBS y reinicia iniciar.bat.")
+
     @app.cli.command("google-autorizar")
     def google_autorizar():
         """Abre el navegador para autorizar YouTube y Google Calendar (una sola vez)."""

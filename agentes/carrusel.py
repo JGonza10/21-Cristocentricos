@@ -1,37 +1,46 @@
-"""Agente de carrusel (fase 3).
+"""Agente de imágenes: difusión antes del evento y carrusel de escenas después.
 
-Dos días antes de cada lunes y viernes genera 5 imágenes de invitación (1080×1350) en
-blanco y vino, más el texto para publicar, y las deja en la bandeja como pendientes:
+Difusión (en cuanto el evento tiene tema, hasta 14 días antes; o a mano con «Generar difusión»):
+  · Carrusel de 5 láminas 1080×1350: invitación, el tema, en vivo, intenciones y cierre.
+  · Reel promocional 1080×1920 de 15 s hecho con 3 láminas verticales (sin música: el audio de
+    moda se le pone al subirlo en cada red).
+Después del evento (lo llama el agente de reels al terminar):
+  · Carrusel de 5 láminas con escenas reales del video y frases que se dijeron.
 
-  1. Invitación   2. Misterios del día   3. En vivo   4. Intenciones   5. Cierre
+Colores de las piezas para redes: blanco y vino (CLAUDE.md §4.4), no el morado de la app.
 """
-from datetime import date
+import textwrap
+import uuid
+from datetime import date, timedelta
 from pathlib import Path
 
 from flask import current_app
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageStat
 
 from app.bandeja import crear_paquete
-from app.modelos import Paquete
+from app.extensiones import db
+from app.modelos import Paquete, Tema
+from servicios import ffmpeg
 
 from . import fechas
 
 ANCHO, ALTO = 1080, 1350
+ALTO_HISTORIA = 1920
 MARGEN = 96
+DIAS_ANTES = 14   # la difusión se arma en cuanto hay tema, hasta 2 semanas antes
 
-# Colores de las piezas para redes (CLAUDE.md §4.4): no usan el morado de la app.
 BLANCO = "#ffffff"
 CREMA = "#fbf9f7"
 VINO = "#7a1c2e"
 VINO_SUAVE = "#f3e4e7"
 TEXTO = "#3a1420"
 ORO = "#8f6b10"
-# Tonos intermedios del vino para la diapositiva de fondo vino y sus líneas
 VINO_MEDIO = "#8e2b3e"
 VINO_LINEA = "#9c4255"
 ROSA_LINEA = "#e5c9cf"
 
 REDES_EN_VIVO = ["YouTube", "Facebook", "Instagram", "TikTok", "Canal de TV"]
+CITA_DEFECTO = ("Hagan lo que Él les diga.", "Jn 2,5")
 
 
 # --- Utilidades de dibujo -----------------------------------------------------------
@@ -109,36 +118,48 @@ def _cruz(d, centro, tam, color) -> None:
     d.rectangle([cx - tam * 0.32, cy - tam * 0.2 - g / 2, cx + tam * 0.32, cy - tam * 0.2 + g / 2], fill=color)
 
 
-def _pie(d, numero: int, color_texto: str, color_linea: str) -> None:
+def _pie(d, numero: int, color_texto: str, color_linea: str, alto: int = ALTO, total: int = 5) -> None:
     canal = current_app.config["CANAL_NOMBRE"]
-    d.line([(MARGEN, ALTO - 130), (ANCHO - MARGEN, ALTO - 130)], fill=color_linea, width=2)
-    d.text((MARGEN, ALTO - 104), canal, font=_fuente("negrita", 30), fill=color_texto)
-    f = _fuente("semi", 28)
-    marca = f"{numero} / 5"
-    d.text((ANCHO - MARGEN - d.textlength(marca, font=f), ALTO - 102), marca, font=f, fill=color_texto)
+    d.line([(MARGEN, alto - 130), (ANCHO - MARGEN, alto - 130)], fill=color_linea, width=2)
+    d.text((MARGEN, alto - 104), canal, font=_fuente("negrita", 30), fill=color_texto)
+    if numero:
+        f = _fuente("semi", 28)
+        marca = f"{numero} / {total}"
+        d.text((ANCHO - MARGEN - d.textlength(marca, font=f), alto - 102), marca, font=f, fill=color_texto)
 
 
-def _lienzo(fondo: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
-    img = Image.new("RGB", (ANCHO, ALTO), fondo)
+def _lienzo(fondo: str, alto: int = ALTO) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    img = Image.new("RGB", (ANCHO, alto), fondo)
     return img, ImageDraw.Draw(img)
 
 
-def _marco(d, color) -> None:
-    d.rounded_rectangle([36, 36, ANCHO - 36, ALTO - 36], radius=28, outline=color, width=3)
+def _marco(d, color, alto: int = ALTO) -> None:
+    d.rounded_rectangle([36, 36, ANCHO - 36, alto - 36], radius=28, outline=color, width=3)
 
 
-# --- Las 5 diapositivas -------------------------------------------------------------
+def _tema(f: date) -> Tema | None:
+    return db.session.get(Tema, f)
 
-def _invitacion(f: date) -> Image.Image:
-    img, d = _lienzo(CREMA)
-    _marco(d, VINO_SUAVE)
-    ancho = ANCHO - 2 * MARGEN
-    _cruz(d, (ANCHO / 2, 250), 96, VINO)
-    _etiqueta(d, (0, 350), "Evento en vivo", ORO, 30, centrado_en=ANCHO / 2)
-    y = _parrafo(d, (MARGEN, 420), "Te invitamos a rezar juntos", _fuente("titulo", 104), TEXTO, ancho,
-                 interlineado=1.08, centrado=True)
-    # Bloque vino con la fecha y la hora
-    caja = [MARGEN + 40, y + 50, ANCHO - MARGEN - 40, y + 300]
+
+def _titulo(f: date) -> str:
+    t = _tema(f)
+    return t.titulo if t else "Evento en vivo"
+
+
+def _cita(f: date) -> tuple[str, str]:
+    """(frase, referencia). La cita del tema puede venir como «Frase (Jn 2,5)» o solo la frase."""
+    t = _tema(f)
+    if not t or not t.cita:
+        return CITA_DEFECTO
+    texto = t.cita.strip()
+    if texto.endswith(")") and "(" in texto:
+        frase, ref = texto.rsplit("(", 1)
+        return frase.strip(), ref[:-1].strip()
+    return texto, ""
+
+
+def _caja_fecha(d, f: date, y: int) -> int:
+    caja = [MARGEN + 40, y, ANCHO - MARGEN - 40, y + 250]
     d.rounded_rectangle(caja, radius=26, fill=VINO)
     fecha_txt = fechas.nombre_fecha(f)
     ft = _ajustar(d, fecha_txt, "extra", 64, caja[2] - caja[0] - 60, 1)
@@ -146,39 +167,57 @@ def _invitacion(f: date) -> Image.Image:
     hora = "10:00 am · hora CDMX"
     fh = _fuente("semi", 40)
     d.text(((ANCHO - d.textlength(hora, font=fh)) / 2, caja[1] + 150), hora, font=fh, fill=VINO_SUAVE)
-    _parrafo(d, (MARGEN, caja[3] + 60), fechas.misterios(f)["nombre"], _fuente("cita", 52), VINO, ancho, centrado=True)
-    _pie(d, 1, TEXTO, VINO_SUAVE)
+    return caja[3]
+
+
+# --- Difusión: carrusel de 5 láminas -------------------------------------------------
+
+def _invitacion(f: date, alto: int = ALTO, numero: int = 1) -> Image.Image:
+    img, d = _lienzo(CREMA, alto)
+    _marco(d, VINO_SUAVE, alto)
+    ancho = ANCHO - 2 * MARGEN
+    extra = (alto - ALTO) // 2
+    _cruz(d, (ANCHO / 2, 230 + extra), 96, VINO)
+    _etiqueta(d, (0, 330 + extra), "Evento en vivo · te invitamos", ORO, 30, centrado_en=ANCHO / 2)
+    ft = _ajustar(d, _titulo(f), "titulo", 104, ancho, 3)
+    y = _parrafo(d, (MARGEN, 400 + extra), _titulo(f), ft, TEXTO, ancho, interlineado=1.08, centrado=True)
+    fin = _caja_fecha(d, f, y + 50)
+    t = _tema(f)
+    if t and t.descripcion:
+        fd = _ajustar(d, t.descripcion, "cita", 46, ancho, 3)
+        _parrafo(d, (MARGEN, fin + 50), t.descripcion, fd, VINO, ancho, centrado=True)
+    _pie(d, numero, TEXTO, VINO_SUAVE, alto)
     return img
 
 
-def _misterios(f: date) -> Image.Image:
+def _el_tema(f: date) -> Image.Image:
     img, d = _lienzo(BLANCO)
-    m = fechas.misterios(f)
     ancho = ANCHO - 2 * MARGEN
-    _etiqueta(d, (MARGEN, 120), f"Los misterios del {fechas.DIAS[f.weekday()]}", ORO, 28)
-    _parrafo(d, (MARGEN, 170), m["nombre"], _fuente("titulo", 92), VINO, ancho, interlineado=1.05)
-    y = 350
-    f_num = _fuente("titulo", 58)
-    f_texto = _fuente("semi", 44)
-    f_cita = _fuente("texto", 30)
-    for i, (nombre, cita) in enumerate(m["lista"], start=1):
-        d.ellipse([MARGEN, y, MARGEN + 84, y + 84], fill=VINO_SUAVE)
-        n = str(i)
-        d.text((MARGEN + 42 - d.textlength(n, font=f_num) / 2, y + 2), n, font=f_num, fill=VINO)
-        fin_y = _parrafo(d, (MARGEN + 116, y + 6), nombre, f_texto, TEXTO, ancho - 116, interlineado=1.18)
-        d.text((MARGEN + 116, fin_y + 4), cita, font=f_cita, fill=ORO)
-        y = max(y + 104, fin_y + 46) + 44
+    t = _tema(f)
+    _etiqueta(d, (MARGEN, 130), "De qué vamos a hablar", ORO, 28)
+    ft = _ajustar(d, _titulo(f), "titulo", 96, ancho, 4)
+    y = _parrafo(d, (MARGEN, 190), _titulo(f), ft, VINO, ancho, interlineado=1.05)
+    if t and t.descripcion:
+        y = _parrafo(d, (MARGEN, y + 40), t.descripcion, _ajustar(d, t.descripcion, "texto", 46, ancho, 6),
+                     TEXTO, ancho, interlineado=1.4)
+    frase, ref = _cita(f)
+    y = max(y + 60, 760)
+    d.rounded_rectangle([MARGEN, y, ANCHO - MARGEN, y + 300], radius=26, fill=VINO_SUAVE)
+    fc = _ajustar(d, f"“{frase}”", "cita", 52, ancho - 80, 3)
+    yy = _parrafo(d, (MARGEN + 40, y + 40), f"“{frase}”", fc, VINO, ancho - 80, interlineado=1.15)
+    if ref:
+        d.text((MARGEN + 40, yy + 10), ref, font=_fuente("semi", 32), fill=ORO)
     _pie(d, 2, TEXTO, VINO_SUAVE)
     return img
 
 
-def _en_vivo(f: date) -> Image.Image:
-    img, d = _lienzo(VINO)
+def _en_vivo(f: date, alto: int = ALTO, numero: int = 3) -> Image.Image:
+    img, d = _lienzo(VINO, alto)
     ancho = ANCHO - 2 * MARGEN
-    # Punto "en vivo"
-    d.ellipse([MARGEN, 136, MARGEN + 30, 166], fill=BLANCO)
-    _etiqueta(d, (MARGEN + 50, 136), "En vivo", BLANCO, 30)
-    y = _parrafo(d, (MARGEN, 220), "Acompáñanos desde donde estés", _fuente("titulo", 96), BLANCO, ancho,
+    extra = (alto - ALTO) // 2
+    d.ellipse([MARGEN, 136 + extra, MARGEN + 30, 166 + extra], fill=BLANCO)
+    _etiqueta(d, (MARGEN + 50, 136 + extra), "En vivo", BLANCO, 30)
+    y = _parrafo(d, (MARGEN, 220 + extra), "Acompáñanos desde donde estés", _fuente("titulo", 96), BLANCO, ancho,
                  interlineado=1.06)
     y += 50
     f_red = _fuente("negrita", 44)
@@ -189,7 +228,7 @@ def _en_vivo(f: date) -> Image.Image:
     enlace = current_app.config["CANAL_ENLACE"]
     detalle = f"{fechas.nombre_fecha(f)} · 10:00 am" + (f"\n{enlace}" if enlace else "")
     _parrafo(d, (MARGEN, y + 20), detalle, _fuente("semi", 36), VINO_SUAVE, ancho, interlineado=1.35)
-    _pie(d, 3, BLANCO, VINO_LINEA)
+    _pie(d, numero, BLANCO, VINO_LINEA, alto)
     return img
 
 
@@ -199,51 +238,55 @@ def _intenciones(f: date) -> Image.Image:
     d.rounded_rectangle([MARGEN - 24, 170, ANCHO - MARGEN + 24, ALTO - 210], radius=34, fill=BLANCO)
     _cruz(d, (ANCHO / 2, 360), 80, VINO)
     _etiqueta(d, (0, 450), "Tus intenciones", ORO, 30, centrado_en=ANCHO / 2)
-    y = _parrafo(d, (MARGEN + 20, 520), "¿Por quién quieres que recemos?", _fuente("titulo", 88), TEXTO,
+    y = _parrafo(d, (MARGEN + 20, 520), "¿Por quién quieres que oremos?", _fuente("titulo", 88), TEXTO,
                  ancho - 40, interlineado=1.08, centrado=True)
     _parrafo(d, (MARGEN + 40, y + 40),
-             "Escríbelas en los comentarios y las presentaremos a la Virgen María durante el evento.",
+             "Escríbelas en los comentarios o por mensaje y las presentaremos durante el evento.",
              _fuente("texto", 42), TEXTO, ancho - 80, interlineado=1.4, centrado=True)
     _pie(d, 4, TEXTO, ROSA_LINEA)
     return img
 
 
-def _cierre(f: date) -> Image.Image:
-    img, d = _lienzo(CREMA)
-    _marco(d, VINO_SUAVE)
+def _cierre(f: date, alto: int = ALTO, numero: int = 5) -> Image.Image:
+    img, d = _lienzo(CREMA, alto)
+    _marco(d, VINO_SUAVE, alto)
     ancho = ANCHO - 2 * MARGEN
-    d.text((MARGEN, 160), "“", font=_fuente("titulo", 220), fill=VINO_SUAVE)
-    y = _parrafo(d, (MARGEN, 330), "Hagan lo que Él les diga.", _fuente("cita", 96), VINO, ancho, interlineado=1.1)
-    d.text((MARGEN, y + 30), "Jn 2,5", font=_fuente("semi", 34), fill=ORO)
+    extra = (alto - ALTO) // 2
+    frase, ref = _cita(f)
+    d.text((MARGEN, 160 + extra), "“", font=_fuente("titulo", 220), fill=VINO_SUAVE)
+    y = _parrafo(d, (MARGEN, 330 + extra), frase, _ajustar(d, frase, "cita", 96, ancho, 4), VINO, ancho,
+                 interlineado=1.1)
+    if ref:
+        d.text((MARGEN, y + 30), ref, font=_fuente("semi", 34), fill=ORO)
     y += 150
     d.line([(MARGEN, y), (MARGEN + 120, y)], fill=ORO, width=4)
     y = _parrafo(d, (MARGEN, y + 50), "Te esperamos", _fuente("titulo", 84), TEXTO, ancho)
     _parrafo(d, (MARGEN, y + 10), f"{fechas.nombre_fecha(f)}\n10:00 am · hora CDMX", _fuente("semi", 42), TEXTO,
              ancho, interlineado=1.35)
-    _pie(d, 5, TEXTO, VINO_SUAVE)
+    _pie(d, numero, TEXTO, VINO_SUAVE, alto)
     return img
 
 
-DIAPOSITIVAS = [_invitacion, _misterios, _en_vivo, _intenciones, _cierre]
+DIAPOSITIVAS = [_invitacion, _el_tema, _en_vivo, _intenciones, _cierre]
 
 
-# --- Texto y paquete ----------------------------------------------------------------
-
-def texto_carrusel(f: date) -> str:
-    m = fechas.misterios(f)
-    enlace = current_app.config["CANAL_ENLACE"]
+def _hashtags() -> str:
     canal = current_app.config["CANAL_NOMBRE"].replace(" ", "")
-    lineas = [
-        "🙏 Evento en vivo",
-        "",
-        f"{fechas.nombre_fecha(f)} · 10:00 am (hora CDMX)",
-        f"Meditaremos los {m['nombre'].lower()}.",
-        "",
-        "Deja tus intenciones en los comentarios y las presentaremos a la Virgen durante el evento.",
-    ]
+    return f"#{canal} #EnVivo #Fe #Oración #Católicos #Dios #Reflexión"
+
+
+def texto_difusion(f: date) -> str:
+    t = _tema(f)
+    enlace = current_app.config["CANAL_ENLACE"]
+    lineas = [f"🙏 {_titulo(f)}", ""]
+    if t and t.descripcion:
+        lineas += [t.descripcion, ""]
+    lineas += [f"📅 {fechas.nombre_fecha(f)} · 10:00 am (hora CDMX)",
+               "📺 En vivo por YouTube, Facebook, Instagram, TikTok y Canal de TV.", "",
+               "Déjanos tus intenciones en los comentarios y compártelo con quien lo necesite. 🤍"]
     if enlace:
         lineas += ["", f"Síguelo en vivo: {enlace}"]
-    lineas += ["", f"#SantoRosario #{canal} #Misterios{m['tipo'].capitalize()} #RosarioEnVivo #Fe #Oración"]
+    lineas += ["", _hashtags()]
     return "\n".join(lineas)
 
 
@@ -257,38 +300,179 @@ def generar_imagenes(f: date, carpeta: Path) -> list[str]:
     return nombres
 
 
-def preparar_carrusel(f: date, forzar: bool = False) -> Paquete | None:
-    """Genera el carrusel de un evento y lo mete a la bandeja.
+def _reel_promocional(f: date, carpeta: Path) -> None:
+    """15 s verticales con 3 láminas de 1080×1920 (invitación, en vivo y te esperamos)."""
+    carpeta.mkdir(parents=True, exist_ok=True)
+    laminas = [_invitacion(f, ALTO_HISTORIA, 0), _en_vivo(f, ALTO_HISTORIA, 0), _cierre(f, ALTO_HISTORIA, 0)]
+    rutas = []
+    for i, img in enumerate(laminas, start=1):
+        ruta = carpeta / f"historia-{i}.png"
+        img.save(ruta, "PNG", optimize=True)
+        rutas.append(ruta)
+    ffmpeg.video_de_imagenes(rutas, carpeta / "promo.mp4", segundos=5)
 
-    No hace nada si ya hay uno (pendiente, aprobado o rechazado), salvo con `forzar=True`.
-    """
+
+def _existentes(f: date, tipo: str, cual: str) -> list[Paquete]:
+    from app.avance import momento
+    return [p for p in Paquete.query.filter_by(tipo=tipo, fecha_evento=f).all() if momento(p) == cual]
+
+
+def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
+    """Carrusel y reel promocional del evento, a la bandeja. Sin `forzar`, no repite lo que ya existe."""
     if not fechas.es_dia_de_evento(f):
         raise ValueError(f"{f} no es lunes ni viernes.")
-    existentes = Paquete.query.filter_by(tipo="carrusel", fecha_evento=f).count()
-    if existentes and not forzar:
-        return None
-    carpeta_rel = f"{f.isoformat()}/carrusel" + (f"-{existentes + 1}" if existentes else "")
-    carpeta = Path(current_app.config["PAQUETES_DIR"]) / carpeta_rel
-    archivos = generar_imagenes(f, carpeta)
-    m = fechas.misterios(f)
-    return crear_paquete("carrusel", f, f"Invitación al evento del {fechas.nombre_fecha(f).lower()}",
-                         texto_carrusel(f), carpeta=carpeta_rel, archivos=archivos,
-                         datos={"misterios": m["tipo"]})
+    nuevos = []
+    previos = _existentes(f, "carrusel", "antes")
+    if forzar or not previos:
+        rel = f"{f.isoformat()}/difusion" + (f"-{len(previos) + 1}" if previos else "")
+        archivos = generar_imagenes(f, Path(current_app.config["PAQUETES_DIR"]) / rel)
+        nuevos.append(crear_paquete("carrusel", f, f"Difusión · {_titulo(f)}"[:120], texto_difusion(f),
+                                    carpeta=rel, archivos=archivos, datos={"momento": "antes"}))
+    previos = _existentes(f, "reel", "antes")
+    if forzar or not previos:
+        rel = f"{f.isoformat()}/promo" + (f"-{len(previos) + 1}" if previos else "")
+        _reel_promocional(f, Path(current_app.config["PAQUETES_DIR"]) / rel)
+        nuevos.append(crear_paquete("reel", f, f"Reel de difusión · {_titulo(f)}"[:120], texto_difusion(f),
+                                    carpeta=rel, archivos=["promo.mp4"], datos={"momento": "antes"}))
+    return nuevos
+
+
+def preparar_carrusel(f: date, forzar: bool = False) -> Paquete | None:
+    """Compatibilidad con el comando «flask carrusel»: arma la difusión y devuelve su carrusel."""
+    nuevos = [p for p in preparar_difusion(f, forzar) if p.tipo == "carrusel"]
+    return nuevos[0] if nuevos else None
 
 
 def tarea() -> list[Paquete]:
-    """Lo que corre el worker cada hora: prepara los carruseles de los próximos 2 días.
+    """Cada hora: arma la difusión de los eventos con tema de las próximas 2 semanas que no la tengan.
 
-    Revisa hoy, mañana y pasado mañana; así, si la PC estuvo apagada justo 2 días antes,
-    se pone al corriente en cuanto se enciende (mientras el evento no haya empezado).
+    Sin tema no se arma (el tema es lo que la hace atractiva); el aviso de Inicio pide ponerlo.
     """
     ahora = fechas.ahora_cdmx()
     nuevos = []
-    for f in fechas.proximos_eventos(ahora.date(), 2):
-        if ahora >= fechas.inicio(f):
+    for f in fechas.proximos_eventos(ahora.date(), DIAS_ANTES):
+        if ahora >= fechas.inicio(f) or _tema(f) is None:
             continue
-        p = preparar_carrusel(f)
-        if p:
-            current_app.logger.info("Carrusel del %s listo en la bandeja (paquete %s)", f, p.id)
-            nuevos.append(p)
+        hechos = preparar_difusion(f)
+        if hechos:
+            current_app.logger.info("Difusión del %s lista en la bandeja (%s piezas)", f, len(hechos))
+            nuevos += hechos
     return nuevos
+
+
+# --- Después del evento: carrusel con escenas del video -----------------------------
+
+def _mejorar(img: Image.Image) -> Image.Image:
+    """Ajuste suave de luz, contraste y color según qué tan oscura salió la escena."""
+    brillo = ImageStat.Stat(img.convert("L")).mean[0]
+    factor = min(max(118 / max(brillo, 1), 0.9), 1.35)
+    img = ImageEnhance.Brightness(img).enhance(factor)
+    img = ImageEnhance.Contrast(img).enhance(1.06)
+    return ImageEnhance.Color(img).enhance(1.1)
+
+
+def _llenar(img: Image.Image, ancho: int, alto: int) -> Image.Image:
+    escala = max(ancho / img.width, alto / img.height)
+    img = img.resize((round(img.width * escala), round(img.height * escala)), Image.LANCZOS)
+    x, y = (img.width - ancho) // 2, (img.height - alto) // 2
+    return img.crop((x, y, x + ancho, y + alto))
+
+
+def frase_de(segmentos: list, inicio: float, fin: float, maximo: int = 150) -> str:
+    """La oración más completa dicha dentro del momento (para ponerla sobre la escena)."""
+    textos = [s[2].strip() for s in segmentos if s[1] > inicio and s[0] < fin and s[2].strip()]
+    if not textos:
+        return ""
+    candidatas = [t for t in textos if 40 <= len(t) <= maximo] or textos
+    mejor = max(candidatas, key=lambda t: (t[-1:] in ".?!", min(len(t), maximo)))
+    return textwrap.shorten(mejor, maximo, placeholder="…")
+
+
+def _portada(escena: Image.Image, f: date) -> Image.Image:
+    img = _llenar(_mejorar(escena), ANCHO, ALTO)
+    capa = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
+    dc = ImageDraw.Draw(capa)
+    for i in range(560):   # degradado vino abajo para que se lea el texto
+        dc.line([(0, ALTO - i), (ANCHO, ALTO - i)], fill=(122, 28, 46, int(235 * (1 - i / 560))))
+    img = Image.alpha_composite(img.convert("RGBA"), capa).convert("RGB")
+    d = ImageDraw.Draw(img)
+    ancho = ANCHO - 2 * MARGEN
+    _etiqueta(d, (MARGEN, ALTO - 470), f"Así vivimos el {fechas.nombre_fecha(f).lower()}", VINO_SUAVE, 26)
+    _parrafo(d, (MARGEN, ALTO - 420), _titulo(f), _ajustar(d, _titulo(f), "titulo", 84, ancho, 2), BLANCO, ancho,
+             interlineado=1.05)
+    _pie(d, 1, BLANCO, VINO_LINEA)
+    return img
+
+
+def _escena_con_frase(escena: Image.Image, frase: str, numero: int) -> Image.Image:
+    img, d = _lienzo(VINO)
+    img.paste(_llenar(_mejorar(escena), ANCHO, 760), (0, 0))
+    ancho = ANCHO - 2 * MARGEN
+    d.text((MARGEN - 10, 700), "“", font=_fuente("titulo", 200), fill=VINO_LINEA)
+    texto = frase or "Gracias por acompañarnos."
+    _parrafo(d, (MARGEN, 850), texto, _ajustar(d, texto, "cita", 58, ancho, 5), BLANCO, ancho, interlineado=1.2)
+    _pie(d, numero, BLANCO, VINO_LINEA)
+    return img
+
+
+def _siguiente(f: date) -> Image.Image:
+    img, d = _lienzo(CREMA)
+    _marco(d, VINO_SUAVE)
+    ancho = ANCHO - 2 * MARGEN
+    prox = fechas.proximos_eventos(f + timedelta(1), 7)[0]
+    _cruz(d, (ANCHO / 2, 240), 90, VINO)
+    _etiqueta(d, (0, 330), "El próximo evento", ORO, 30, centrado_en=ANCHO / 2)
+    t = _tema(prox)
+    titulo = t.titulo if t else "Te esperamos"
+    y = _parrafo(d, (MARGEN, 400), titulo, _ajustar(d, titulo, "titulo", 96, ancho, 3), TEXTO, ancho,
+                 interlineado=1.08, centrado=True)
+    fin = _caja_fecha(d, prox, y + 50)
+    _parrafo(d, (MARGEN, fin + 60), "Síguenos y activa las notificaciones para no perdértelo.",
+             _fuente("semi", 40), VINO, ancho, interlineado=1.3, centrado=True)
+    _pie(d, 5, TEXTO, VINO_SUAVE)
+    return img
+
+
+def texto_escenas(f: date, frases: list[str]) -> str:
+    lineas = [f"✨ Así vivimos «{_titulo(f)}»", ""]
+    if frases:
+        lineas += [f"“{frases[0]}”", ""]
+    prox = fechas.proximos_eventos(f + timedelta(1), 7)[0]
+    lineas += [f"Gracias a todos los que nos acompañaron. Te esperamos el {fechas.nombre_fecha(prox).lower()} "
+               "a las 10:00 am (hora CDMX).", "", "Desliza para ver más 👉", "", _hashtags()]
+    return "\n".join(lineas)
+
+
+def carrusel_de_escenas(f: date, video: Path, momentos: list[dict], segmentos: list) -> Paquete | None:
+    """5 láminas: portada con una escena, 3 escenas con su frase y la invitación al siguiente evento."""
+    if not momentos:
+        return None
+    previos = _existentes(f, "carrusel", "despues")
+    rel = f"{f.isoformat()}/escenas" + (f"-{len(previos) + 1}" if previos else "")
+    carpeta = Path(current_app.config["PAQUETES_DIR"]) / rel
+    carpeta.mkdir(parents=True, exist_ok=True)
+    indices = sorted({0, len(momentos) // 2, len(momentos) - 1})
+    elegidos = [momentos[i] for i in indices]
+    while len(elegidos) < 3:
+        elegidos.append(momentos[len(elegidos) % len(momentos)])
+
+    def escena(m: dict, donde: float = 0.5) -> Image.Image:
+        ruta = carpeta / f"_cuadro-{uuid.uuid4().hex[:8]}.png"
+        ffmpeg.cuadro(str(video), m["inicio"] + (m["fin"] - m["inicio"]) * donde, ruta)
+        try:
+            with Image.open(ruta) as im:
+                return im.convert("RGB")
+        finally:
+            ruta.unlink(missing_ok=True)
+
+    frases = [frase_de(segmentos, m["inicio"], m["fin"]) for m in elegidos]
+    laminas = [_portada(escena(momentos[len(momentos) // 2], 0.3), f)]
+    laminas += [_escena_con_frase(escena(m), fr, i) for i, (m, fr) in enumerate(zip(elegidos, frases), start=2)]
+    laminas.append(_siguiente(f))
+    archivos = []
+    for i, img in enumerate(laminas, start=1):
+        img.save(carpeta / f"{i}.png", "PNG", optimize=True)
+        archivos.append(f"{i}.png")
+    return crear_paquete("carrusel", f, f"Carrusel del evento · {_titulo(f)}"[:120],
+                         texto_escenas(f, [x for x in frases if x]), carpeta=rel, archivos=archivos,
+                         datos={"momento": "despues"})

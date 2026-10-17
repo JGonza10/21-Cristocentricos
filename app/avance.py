@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from flask import Blueprint, current_app, g, jsonify, request
 
 from .extensiones import db
-from .modelos import PASOS_EVENTO, AvancePaso, Grabacion, Paquete, Reporte, Turno
+from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, Grabacion, Paquete, Reporte, Tema, Turno
 from .seguridad import login_requerido
 
 bp = Blueprint("avance", __name__, url_prefix="/api/avance")
@@ -22,18 +22,28 @@ DIAS_ATRAS = 10  # un evento sin terminar sigue siendo "el activo" hasta 10 día
 
 # Cómo se cumple cada paso (lo ve la persona en la tarjeta).
 COMO = {
+    "tema": "Se marca solo cuando el evento tiene tema y guion guardados en el calendario.",
     "turnos": "Se marca solo cuando el evento tiene quién dirija.",
-    "prepara": "Márcalo cuando tengas listas las intenciones, el guion y la lista previa.",
+    "difusion": "Se marca solo cuando el material de difusión del evento ya se revisó en la bandeja.",
+    "revision": "Se marca solo cuando palomeas toda la revisión técnica del día.",
     "vivo": "Se marca solo al terminar el horario del evento (11 am).",
-    "grabacion": "Se marca solo cuando llega la grabación a la carpeta y se procesa.",
+    "grabacion": "Se marca solo cuando llega la grabación (OBS o subida desde la app) y se procesa.",
     "reels": "Se marca solo cuando los reels del evento llegan a la bandeja.",
-    "carrusel": "Se marca solo cuando el carrusel del evento llega a la bandeja.",
+    "carrusel": "Se marca solo cuando el carrusel con escenas del video llega a la bandeja.",
     "bandeja": "Se marca solo cuando ya no queda nada de este evento por revisar.",
     "publicacion": "Se marca solo cuando todo lo aprobado ya se subió o quedó en su carpeta.",
     "redes": "Se marca solo cuando no queda nada por subir a mano ni con error.",
-    "registro": "Márcalo cuando anotes el video en la hoja de registro (o omítelo mientras no exista).",
+    "registro": "Se marca solo: la app guarda el registro del video cuando termina la publicación.",
     "mides": "Se marca solo cuando el reporte semanal de esa semana ya está hecho (lunes 8 am).",
 }
+
+
+def momento(p: Paquete) -> str:
+    """'antes' = difusión del evento; 'despues' = lo que sale del video (reels y carrusel de escenas)."""
+    m = (p.datos or {}).get("momento")
+    if m in ("antes", "despues"):
+        return m
+    return "despues" if p.tipo == "reel" else "antes"   # carruseles viejos eran la invitación
 
 
 class ErrorAvance(Exception):
@@ -66,6 +76,16 @@ def _automatico(f: date) -> dict:
     """{paso: (estado, detalle)} de lo que el sistema puede comprobar solo."""
     from agentes import fechas
     r = {}
+    tema = db.session.get(Tema, f)
+    if tema and tema.guion.strip():
+        r["tema"] = ("hecho", f"Tema: {tema.titulo}.")
+    elif tema:
+        r["tema"] = ("pendiente", f"Tema: {tema.titulo}. Falta el guion.")
+    if tema and tema.checklist:
+        marcas = tema.checklist
+        faltan = [t for k, t in CHECKLIST if not marcas.get(k)]
+        r["revision"] = ("hecho", "Revisión técnica completa.") if not faltan else             ("pendiente", f"Faltan {len(faltan)} de {len(CHECKLIST)} puntos de la revisión.")
+
     dirige = Turno.query.filter_by(fecha=f, rol="dirige").first()
     if dirige:
         r["turnos"] = ("hecho", f"Dirige {dirige.integrante.nombre}.")
@@ -79,12 +99,18 @@ def _automatico(f: date) -> dict:
     elif grab:
         r["grabacion"] = ("pendiente", "Procesando la grabación." if grab.estado != "error" else (grab.error or "La grabación falló."))
 
-    paquetes = Paquete.query.filter_by(fecha_evento=f).all()
+    todos = Paquete.query.filter_by(fecha_evento=f).all()
+    antes = [p for p in todos if momento(p) == "antes"]
+    paquetes = [p for p in todos if momento(p) == "despues"]
+    if antes:
+        pend = [p for p in antes if p.estado == "pendiente"]
+        r["difusion"] = ("pendiente", f"{_plural(len(pend), 'pieza de difusión espera', 'piezas de difusión esperan')} tu revisión.")             if pend else ("hecho", f"Difusión revisada: {_plural(sum(p.estado == 'aprobado' for p in antes), 'pieza aprobada', 'piezas aprobadas')}.")
+
     reels = [p for p in paquetes if p.tipo == "reel"]
     if reels:
         r["reels"] = ("hecho", f"{_plural(len(reels), 'reel llegó', 'reels llegaron')} a la bandeja.")
     if any(p.tipo == "carrusel" for p in paquetes):
-        r["carrusel"] = ("hecho", "El carrusel llegó a la bandeja.")
+        r["carrusel"] = ("hecho", "El carrusel con escenas del video llegó a la bandeja.")
 
     pendientes = [p for p in paquetes if p.estado == "pendiente"]
     aprobados = [p for p in paquetes if p.estado == "aprobado"]
@@ -112,6 +138,8 @@ def _automatico(f: date) -> dict:
             error = sum(1 for x in faltan if x.estado == "error")
             partes = ([f"{manual} por subir a mano"] if manual else []) + ([f"{error} con error"] if error else [])
             r["redes"] = ("pendiente", ", ".join(partes) + "." if partes else "Subiendo…")
+    if r.get("redes", ("",))[0] in ("hecho", "omitido"):
+        r["registro"] = ("hecho", "Quedó en el registro de la app (descárgalo desde el reporte).")
 
     lunes = f - timedelta(f.weekday())
     if db.session.get(Reporte, lunes):
@@ -139,7 +167,8 @@ def avance(f: date) -> dict:
             actual = paso
         pasos.append(item)
     hechos = sum(1 for p in pasos if p["estado"] != "pendiente")
-    return {"fecha": f.isoformat(), "nombre": fechas.nombre_fecha(f), "misterios": fechas.misterios(f)["nombre"],
+    tema = db.session.get(Tema, f)
+    return {"fecha": f.isoformat(), "nombre": fechas.nombre_fecha(f), "tema": tema.titulo if tema else None,
             "pasos": pasos, "actual": actual, "hechos": hechos, "total": len(pasos), "completo": actual is None}
 
 

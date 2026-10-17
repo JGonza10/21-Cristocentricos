@@ -34,7 +34,8 @@ def test_migracion_agrega_columnas_sin_borrar_datos(tmp_path):
 def test_planificador_tiene_todos_los_agentes(app):
     sched = worker.crear_planificador(app)
     ids = {j.id for j in sched.get_jobs()}
-    assert ids == {"latido", "carrusel", "reels", "recortes", "publicacion", "reparto", "invitaciones", "reporte"}
+    assert ids == {"latido", "carrusel", "reels", "recortes", "publicacion", "reparto", "invitaciones", "reporte",
+                   "avisos", "ideas", "grabacion"}
     reparto = sched.get_job("reparto").trigger
     assert "day_of_week='sun'" in str(reparto) and "hour='18'" in str(reparto)
 

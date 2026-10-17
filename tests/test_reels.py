@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from agentes import reels
 from app.extensiones import db
@@ -33,7 +34,7 @@ def test_elige_3_momentos_sin_traslape_y_con_duracion_correcta():
     segs = evento_falso(especiales={100: "Primer misterio gozoso: la Anunciación",
                                      300: "Pedimos por las intenciones de todos ustedes",
                                      560: "En el nombre del Padre, del Hijo y del Espíritu Santo"})
-    momentos = reels.elegir_momentos(segs, [], 600)
+    momentos = reels.elegir_momentos(segs, [], 600, cuantos=3)
     assert len(momentos) == 3
     for m in momentos:
         assert 30 <= m["fin"] - m["inicio"] <= 55
@@ -43,6 +44,14 @@ def test_elige_3_momentos_sin_traslape_y_con_duracion_correcta():
     assert [m["inicio"] for m in momentos] == [100, 300, 560]
     assert [reels.etiqueta(m) for m in momentos] == ["Anuncio del primer misterio", "Intenciones",
                                                      "Cierre y bendición"]
+
+
+def test_por_defecto_son_5_reels_repartidos():
+    momentos = reels.elegir_momentos(evento_falso(duracion=900), [], 900)
+    assert len(momentos) == 5
+    for a, b in zip(momentos, momentos[1:]):
+        assert a["fin"] <= b["inicio"]
+    assert len({int(m["inicio"] // 180) for m in momentos}) == 5     # uno en cada quinto del evento
 
 
 def test_anuncio_de_misterio_gana_a_intenciones():
@@ -98,11 +107,16 @@ def test_parsear_silencios():
 
 
 def test_texto_del_reel(app):
+    from app.modelos import Tema
+    segs = [[0, 5, "El perdón nos libera"], [5, 10, "y nos devuelve la paz"]]
     with app.app_context():
-        t = reels.texto_reel(date(2026, 10, 23), {"inicio": 0, "fin": 10},
-                             [[0, 5, "Cuarto misterio doloroso"], [5, 10, "Jesús con la cruz a cuestas"]])
-    assert t.startswith("“Cuarto misterio doloroso Jesús con la cruz a cuestas”")
-    assert "Misterios dolorosos" in t and "#MisteriosDolorosos" in t
+        sin_tema = reels.texto_reel(date(2026, 10, 23), {"inicio": 0, "fin": 10}, segs)
+        db.session.add(Tema(fecha=date(2026, 10, 23), titulo="El perdón"))
+        db.session.commit()
+        t = reels.texto_reel(date(2026, 10, 23), {"inicio": 0, "fin": 10}, segs)
+    assert t.startswith("“El perdón nos libera y nos devuelve la paz”")
+    assert "Evento · Viernes 23 de octubre" in sin_tema
+    assert "El perdón · Viernes 23 de octubre" in t and "#Reels" in t
 
 
 # --- Carpeta de grabaciones y bandeja -----------------------------------------------
@@ -175,9 +189,13 @@ def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
         db.session.add(g)
         db.session.commit()
         nuevos = reels.procesar(g)
-        assert len(nuevos) == 1
+        assert [x.tipo for x in nuevos] == ["reel", "carrusel"]          # 1 reel + carrusel de escenas
         p = nuevos[0]
         assert p.titulo == "Reel 1 · Anuncio del primer misterio" and p.estado == "pendiente"
+        escenas = nuevos[1]
+        assert escenas.datos["momento"] == "despues" and len(escenas.archivos) == 5
+        with Image.open(Path(app.config["PAQUETES_DIR"]) / escenas.carpeta / "2.png") as img:
+            assert img.size == (1080, 1350)
         salida = Path(app.config["PAQUETES_DIR"]) / p.carpeta / "reel.mp4"
         info = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height",
                                "-of", "csv=p=0", str(salida)], capture_output=True, text=True).stdout

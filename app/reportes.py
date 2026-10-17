@@ -5,6 +5,7 @@
     POST /api/reportes/generar         {"semana": "AAAA-MM-DD"} (opcional; por omisión, la semana actual)
     GET  /api/seguidores               último conteo por red
     PUT  /api/seguidores               {"instagram": 120, "facebook": 300, ...} con fecha de hoy
+    GET  /api/registro[.csv]           registro de cada evento (sustituye a la hoja de Google Sheets)
 """
 from datetime import date
 
@@ -90,3 +91,57 @@ def capturar_seguidores():
     db.session.commit()
     current_app.logger.info("Seguidores capturados por %s", g.usuario.usuario)
     return ver_seguidores()
+
+
+def _registro() -> list[dict]:
+    """Una fila por evento que ya tiene grabación o contenido: lo que antes iba a la hoja de registro."""
+    from agentes import fechas
+
+    from .avance import momento
+    from .modelos import Grabacion, Paquete, Tema
+    filas = {}
+    for g_ in Grabacion.query.filter(Grabacion.fecha_evento.isnot(None)).all():
+        filas.setdefault(g_.fecha_evento, {})["grabacion"] = g_
+    for p in Paquete.query.all():
+        filas.setdefault(p.fecha_evento, {}).setdefault("paquetes", []).append(p)
+    salida = []
+    for f in sorted(filas, reverse=True):
+        d = filas[f]
+        grab, paquetes = d.get("grabacion"), d.get("paquetes", [])
+        tema = db.session.get(Tema, f)
+        pubs = [x for p in paquetes for x in p.publicaciones]
+        salida.append({
+            "fecha": f.isoformat(), "evento": fechas.nombre_fecha(f), "tema": tema.titulo if tema else "",
+            "video": grab.nombre if grab else "", "minutos": round((grab.duracion or 0) / 60) if grab else 0,
+            "difusion": sum(momento(p) == "antes" for p in paquetes),
+            "reels": sum(p.tipo == "reel" and momento(p) == "despues" for p in paquetes),
+            "carrusel": any(p.tipo == "carrusel" and momento(p) == "despues" for p in paquetes),
+            "aprobados": sum(p.estado == "aprobado" for p in paquetes),
+            "rechazados": sum(p.estado == "rechazado" for p in paquetes),
+            **{red: sum(x.red == red and x.estado == "publicado" for x in pubs) for red in REDES},
+        })
+    return salida
+
+
+@bp.get("/registro")
+@login_requerido
+def registro():
+    return jsonify(registro=_registro())
+
+
+@bp.get("/registro.csv")
+@login_requerido
+def registro_csv():
+    import csv
+    import io
+    filas = _registro()
+    buf = io.StringIO()
+    columnas = ["fecha", "evento", "tema", "video", "minutos", "difusion", "reels", "carrusel", "aprobados",
+                "rechazados", *REDES]
+    w = csv.DictWriter(buf, fieldnames=columnas)
+    w.writeheader()
+    for f in filas:
+        # Texto que empiece con = + - @ se abriría como fórmula en Excel: se le antepone un apóstrofo.
+        w.writerow({k: ("'" + v if isinstance(v, str) and v[:1] in "=+-@" else v) for k, v in f.items()})
+    return current_app.response_class("\ufeff" + buf.getvalue(), mimetype="text/csv",
+                                      headers={"Content-Disposition": "attachment; filename=registro-eventos.csv"})

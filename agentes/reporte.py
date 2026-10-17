@@ -36,6 +36,12 @@ def _seguidores(hasta: date) -> dict:
     return resultado
 
 
+def _tema(f: date) -> str:
+    from app.modelos import Tema
+    t = db.session.get(Tema, f)
+    return t.titulo if t else "Sin tema"
+
+
 def _evento(f: date, hoy: date) -> dict:
     turnos = Turno.query.filter_by(fecha=f).all()
     dirige = next((t.integrante.nombre for t in turnos if t.rol == "dirige"), None)
@@ -49,7 +55,7 @@ def _evento(f: date, hoy: date) -> dict:
             pubs.setdefault(x.red, {}).setdefault(x.estado, 0)
             pubs[x.red][x.estado] += 1
     return {
-        "fecha": f.isoformat(), "nombre": fechas.nombre_fecha(f), "misterios": fechas.misterios(f)["nombre"],
+        "fecha": f.isoformat(), "nombre": fechas.nombre_fecha(f), "tema": _tema(f),
         "ya_paso": f < hoy or (f == hoy and fechas.ahora_cdmx() >= fechas.fin(f)),
         "dirige": dirige, "apoyan": apoyan,
         "grabacion": {"nombre": grab.nombre, "estado": grab.estado,

@@ -3,9 +3,10 @@
 Cuando llega una grabación a grabaciones/:
   1. faster-whisper la transcribe (con marcas de tiempo por segmento).
   2. Se buscan frases clave y se arman candidatos de 30 a 55 s (reglas de CLAUDE.md §2.1).
-  3. Se eligen 3 momentos sin traslape, repartidos en el evento.
+  3. Se eligen 5 momentos sin traslape, repartidos en el evento.
   4. ffmpeg los pasa a vertical 9:16 con subtítulos y el nombre del canal.
   5. Cada reel entra a la bandeja como pendiente.
+  6. Con esos momentos se arma el carrusel de escenas (agentes/carrusel.py).
 """
 import re
 import textwrap
@@ -25,7 +26,7 @@ EXTENSIONES = {".mp4", ".mkv", ".mov", ".webm", ".flv"}
 SEGUNDOS_ESTABLE = 60     # el archivo no debe cambiar en este tiempo (OBS terminó de escribir)
 DURACION_MIN, DURACION_MAX, DURACION_IDEAL = 30.0, 55.0, 45.0
 RECORTE_MIN, RECORTE_MAX = 5.0, 59.0
-CUANTOS = 3
+CUANTOS = 5
 
 ORDINALES = {"primer": "primer", "segundo": "segundo", "tercer": "tercer", "cuarto": "cuarto", "quinto": "quinto"}
 
@@ -97,15 +98,15 @@ def candidatos(segmentos: list, silencios: list, duracion: float) -> list[dict]:
 def elegir_momentos(segmentos: list, silencios: list, duracion: float, cuantos: int = CUANTOS) -> list[dict]:
     """Los `cuantos` mejores momentos, sin traslape y repartidos (uno por tercio si se puede)."""
     cands = sorted(candidatos(segmentos, silencios, duracion), key=lambda c: -c["puntaje"])
-    tercio = max(duracion, 1.0) / 3
+    parte = max(duracion, 1.0) / cuantos
     elegidos: list[dict] = []
 
     def libre(c):
         return all(c["fin"] + 2 <= e["inicio"] or c["inicio"] >= e["fin"] + 2 for e in elegidos)
 
     usados = set()
-    for c in cands:                      # 1a pasada: un momento por tercio del evento
-        t = min(int(c["inicio"] // tercio), 2)
+    for c in cands:                      # 1a pasada: un momento por cada parte del evento
+        t = min(int(c["inicio"] // parte), cuantos - 1)
         if len(elegidos) < cuantos and t not in usados and libre(c):
             elegidos.append(c)
             usados.add(t)
@@ -152,13 +153,12 @@ def texto_reel(fecha, momento: dict, segmentos: list) -> str:
     frase = " ".join(s[2] for s in segmentos if s[1] > momento["inicio"] and s[0] < momento["fin"])
     frase = textwrap.shorten(frase, 180, placeholder="…") if frase else ""
     canal = current_app.config["CANAL_NOMBRE"].replace(" ", "")
-    m = fechas.misterios(fecha) if fechas.es_dia_de_evento(fecha) else None
+    from app.temas import titulo_de
+    tema = titulo_de(fecha)
     lineas = [f"“{frase}”", ""] if frase else []
-    lineas.append(f"Evento · {m['nombre']} · {fechas.nombre_fecha(fecha)}" if m
-                  else f"Evento · {fechas.nombre_fecha(fecha)}")
-    lineas += ["Rezamos en vivo cada lunes y viernes a las 10:00 am (hora CDMX).", "",
-               f"#SantoRosario #{canal} " + (f"#Misterios{m['tipo'].capitalize()} " if m else "")
-               + "#Reels #Fe #Oración"]
+    lineas.append(f"{tema} · {fechas.nombre_fecha(fecha)}" if tema else f"Evento · {fechas.nombre_fecha(fecha)}")
+    lineas += ["En vivo cada lunes y viernes a las 10:00 am (hora CDMX). Síguenos para no perdértelo.", "",
+               f"#{canal} #Reels #Fe #Oración #Católicos #Reflexión"]
     return "\n".join(lineas)
 
 
@@ -175,7 +175,7 @@ def _render(grab: Grabacion, inicio: float, fin: float, carpeta_rel: str) -> Non
     ffmpeg.cortar_vertical(
         str(_dir_grabaciones() / grab.nombre), inicio, fin, srt_para(grab.segmentos or [], inicio, fin),
         current_app.config["CANAL_NOMBRE"], Path(current_app.config["FUENTES_DIR"]) / "PublicSans_700Bold.ttf",
-        salida)
+        salida, mejorar=current_app.config.get("MEJORAR_VIDEO", True))
 
 
 def procesar(grab: Grabacion) -> list[Paquete]:
@@ -194,14 +194,25 @@ def procesar(grab: Grabacion) -> list[Paquete]:
         if not momentos:
             raise ValueError("sin momentos")
         nuevos = []
+        from app.temas import titulo_de
+        tema = titulo_de(grab.fecha_evento)
         for k, m in enumerate(momentos, start=1):
             carpeta_rel = f"{grab.fecha_evento.isoformat()}/reel-{grab.id}-{k}"
             _render(grab, m["inicio"], m["fin"], carpeta_rel)
             nuevos.append(crear_paquete(
-                "reel", grab.fecha_evento, f"Reel {k} · {etiqueta(m)}",
+                "reel", grab.fecha_evento, f"Reel {k} · {tema or etiqueta(m)}"[:120],
                 texto_reel(grab.fecha_evento, m, grab.segmentos), carpeta=carpeta_rel, archivos=["reel.mp4"],
                 datos={"grabacion_id": grab.id, "inicio": m["inicio"], "fin": m["fin"],
-                       "duracion_fuente": grab.duracion, "tipo": m["tipo"]}))
+                       "duracion_fuente": grab.duracion, "tipo": m["tipo"], "momento": "despues"}))
+        try:   # el carrusel de escenas es extra: si falla, los reels igual quedan
+            from .carrusel import carrusel_de_escenas
+            p = carrusel_de_escenas(grab.fecha_evento, ruta, momentos, grab.segmentos)
+            if p:
+                nuevos.append(p)
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            current_app.logger.exception("No se pudo armar el carrusel de escenas de %s", grab.nombre)
+            grab = db.session.get(Grabacion, grab.id)
         grab.estado = "lista"
     except Exception as e:  # noqa: BLE001 — cualquier fallo queda registrado y visible
         db.session.rollback()

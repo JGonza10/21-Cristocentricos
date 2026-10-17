@@ -4,7 +4,10 @@
 
 Horarios (hora CDMX):
   - cada minuto ........ latido (para que Inicio sepa que el worker está vivo)
-  - cada hora ........... carrusel de los próximos 2 días (si falta) e invitaciones
+  - cada 15 minutos ..... difusión de los eventos con tema (próximas 2 semanas)
+  - cada 10 minutos ..... invitaciones de Google Calendar
+  - cada 5 minutos ...... avisos del tema por correo
+  - cada minuto ......... ideas por voz a texto · grabación automática con OBS (días de evento)
   - cada 2 minutos ...... revisar grabaciones/ (además, watchdog avisa al instante)
   - cada 30 segundos .... recortes de reels pedidos desde la bandeja
   - cada 3 minutos ...... publicar lo aprobado
@@ -24,7 +27,7 @@ from watchdog.observers import Observer
 from app import create_app
 from app.extensiones import db
 
-from . import carrusel, publicacion, reels, reporte, turnos
+from . import avisos, carrusel, grabacion, ideas, publicacion, reels, reporte, turnos
 from .estado import latido
 from .fechas import CDMX
 
@@ -53,9 +56,15 @@ def crear_planificador(app) -> BlockingScheduler:
     sched.add_job(trabajo("worker", lambda: None, lambda _: "Activo"), "interval", minutes=1,
                   id="latido", next_run_time=ahora)
     sched.add_job(trabajo("carrusel", carrusel.tarea,
-                          lambda r: f"{_plural(len(r), 'carrusel nuevo', 'carruseles nuevos')} en la bandeja"
+                          lambda r: f"{_plural(len(r), 'pieza de difusión nueva', 'piezas de difusión nuevas')} en la bandeja"
                           if r else "Al día"),
-                  "cron", minute=5, id="carrusel", next_run_time=ahora + timedelta(seconds=5))
+                  "interval", minutes=15, id="carrusel", next_run_time=ahora + timedelta(seconds=5))
+    sched.add_job(trabajo("avisos", avisos.tarea, lambda n: f"{_plural(n, 'aviso enviado', 'avisos enviados')}"),
+                  "interval", minutes=5, id="avisos", next_run_time=ahora + timedelta(seconds=25))
+    sched.add_job(trabajo("ideas", ideas.tarea, lambda n: f"{_plural(n, 'idea transcrita', 'ideas transcritas')}"),
+                  "interval", minutes=1, id="ideas", next_run_time=ahora + timedelta(seconds=30))
+    sched.add_job(trabajo("grabacion", grabacion.tarea, lambda m: m),
+                  "interval", minutes=1, id="grabacion", next_run_time=ahora + timedelta(seconds=35))
     sched.add_job(trabajo("reels", reels.revisar_carpeta,
                           lambda r: f"{_plural(len(r), 'reel nuevo', 'reels nuevos')} en la bandeja"
                           if r else "Esperando grabaciones"),
@@ -70,7 +79,7 @@ def crear_planificador(app) -> BlockingScheduler:
                   "cron", day_of_week="sun", hour=18, minute=0, id="reparto")
     sched.add_job(trabajo("invitaciones", turnos.sincronizar_invitaciones,
                           lambda n: f"{_plural(n, 'invitación actualizada', 'invitaciones actualizadas')}"),
-                  "cron", minute=20, id="invitaciones", next_run_time=ahora + timedelta(seconds=20))
+                  "interval", minutes=10, id="invitaciones", next_run_time=ahora + timedelta(seconds=20))
     sched.add_job(trabajo("reporte", reporte.tarea_semanal, lambda s: f"Reporte de la semana del {s.day}/{s.month} listo"),
                   "cron", day_of_week="mon", hour=8, minute=0, id="reporte")
     return sched

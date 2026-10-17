@@ -1,4 +1,4 @@
-"""Credenciales de Google (una sola autorización para YouTube y Calendar).
+"""Credenciales de Google (una sola autorización para YouTube, Calendar y Gmail).
 
 Archivos en secretos/ (nunca en git):
   client_secret.json  -> se descarga de Google Cloud Console (OAuth, "App de escritorio")
@@ -11,6 +11,7 @@ from flask import current_app
 ALCANCES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/gmail.send",   # avisos del tema al equipo
 ]
 
 
@@ -31,7 +32,7 @@ def credenciales():
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
 
-    cred = Credentials.from_authorized_user_file(str(token), ALCANCES)
+    cred = Credentials.from_authorized_user_file(str(token))   # con los alcances que se autorizaron
     if not cred.valid and cred.expired and cred.refresh_token:
         cred.refresh(Request())
         token.write_text(cred.to_json(), encoding="utf-8")

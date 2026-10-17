@@ -8,14 +8,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
-from . import auth, avance, bandeja, cli, equipo, errores, panel, reportes
+from . import auth, avance, bandeja, cli, equipo, errores, ideas, panel, reportes, temas
+from . import grabar
 from .migracion import migrar
 from .extensiones import csrf, db
 
 RAIZ = Path(__file__).resolve().parent.parent
 
 CSP = (
-    "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; "
+    "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
     "style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
     "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 )
@@ -61,6 +62,11 @@ def create_app(config: dict | None = None) -> Flask:
         META_TOKEN=os.environ.get("META_TOKEN", ""),
         META_GRAPH_VERSION=os.environ.get("META_GRAPH_VERSION", "v23.0"),
         LOG_DIR=RAIZ / "datos" / "logs",
+        IDEAS_DIR=RAIZ / "datos" / "ideas",
+        MEJORAR_VIDEO=os.environ.get("MEJORAR_VIDEO", "1") == "1",   # luz, color y volumen de los reels
+        OBS_PASSWORD=os.environ.get("OBS_PASSWORD", ""),
+        OBS_PUERTO=int(os.environ.get("OBS_PUERTO", "4455")),
+        OBS_AUTO=os.environ.get("OBS_AUTO", "1") == "1",            # grabar solo los días de evento
         EJEMPLO=os.environ.get("EJEMPLO", "0") == "1",  # solo la copia de ejemplo (ejemplo.py)
     )
     if config:
@@ -77,6 +83,9 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(panel.bp)
     app.register_blueprint(avance.bp)
     app.register_blueprint(reportes.bp)
+    app.register_blueprint(temas.bp)
+    app.register_blueprint(ideas.bp)
+    app.register_blueprint(grabar.bp)
     if app.config["EJEMPLO"]:
         from . import ejemplo
         app.register_blueprint(ejemplo.bp)
@@ -90,7 +99,7 @@ def create_app(config: dict | None = None) -> Flask:
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "same-origin")
         resp.headers.setdefault("Content-Security-Policy", CSP)
-        resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
         return resp
 
     with app.app_context():

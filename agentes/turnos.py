@@ -80,15 +80,24 @@ def tarea_reparto() -> list[Turno]:
 
 
 def _descripcion(f: date) -> str:
+    from app.temas import tema_de
     t = turnos_de(f)
-    m = fechas.misterios(f)["nombre"] if fechas.es_dia_de_evento(f) else "Evento"
-    lineas = [f"{m} · 10:00 a 11:00 am (hora CDMX)", ""]
+    tema = tema_de(f)
+    lineas = [f"Tema: {tema.titulo}" if tema else "Tema: por definir", "10:00 a 11:00 am (hora CDMX)", ""]
+    if tema and tema.descripcion:
+        lineas[1:1] = [tema.descripcion]
     if t["dirige"]:
         lineas.append(f"Dirige: {t['dirige'].integrante.nombre}")
     if t["apoyan"]:
         lineas.append("Apoya: " + ", ".join(x.integrante.nombre for x in t["apoyan"]))
     lineas += ["", f"Invitación automática de {current_app.config['CANAL_NOMBRE']}."]
     return "\n".join(lineas)
+
+
+def _titulo_evento(f: date) -> str:
+    from app.temas import titulo_de
+    tema = titulo_de(f)
+    return f"Evento en vivo · {tema}" if tema else f"Evento en vivo · {fechas.nombre_fecha(f)}"
 
 
 def sincronizar_invitaciones(dias: int = 14) -> int:
@@ -109,7 +118,7 @@ def sincronizar_invitaciones(dias: int = 14) -> int:
         try:
             ev.google_id = calendario.sincronizar(
                 f, current_app.config["GOOGLE_CALENDAR_ID"],
-                f"Evento en vivo · {fechas.nombre_fecha(f)}", _descripcion(f), correos, ev.google_id)
+                _titulo_evento(f), _descripcion(f), correos, ev.google_id)
             ev.invitados, ev.estado, ev.error = correos, "enviada", None
             tocados += 1
         except Exception:  # noqa: BLE001

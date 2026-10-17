@@ -13,11 +13,14 @@ bp = Blueprint("panel", __name__, url_prefix="/api")
 
 AGENTES = {
     "worker": "Worker",
-    "carrusel": "Carrusel",
+    "carrusel": "Difusión",
     "reels": "Reels",
     "publicacion": "Publicación",
     "turnos": "Turnos",
     "reporte": "Reporte semanal",
+    "avisos": "Avisos del tema",
+    "ideas": "Ideas por voz",
+    "grabacion": "Grabación con OBS",
 }
 LATIDO_MAX = timedelta(minutes=3)
 
