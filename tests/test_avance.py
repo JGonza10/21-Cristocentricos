@@ -1,0 +1,150 @@
+"""Avance guiado por evento y reporte semanal automático."""
+from datetime import date, datetime
+
+import pytest
+
+from agentes import fechas, reporte
+from app.bandeja import crear_paquete
+from app.extensiones import db
+from app.modelos import Grabacion, Integrante, Publicacion, Reporte, Turno
+
+from .conftest import enviar, login
+
+VIERNES = date(2026, 10, 16)
+LUNES_SEMANA = date(2026, 10, 12)
+
+
+@pytest.fixture(autouse=True)
+def reloj_fijo(monkeypatch):
+    """Sábado 17 de octubre de 2026, 9 am: el viernes 16 ya pasó."""
+    monkeypatch.setattr(fechas, "hoy_cdmx", lambda: date(2026, 10, 17))
+    monkeypatch.setattr(fechas, "ahora_cdmx", lambda: datetime(2026, 10, 17, 9, 0, tzinfo=fechas.CDMX))
+
+
+def pasos(d):
+    return {p["id"]: p["estado"] for p in d["pasos"]}
+
+
+def test_evento_nuevo_empieza_en_turnos(cliente):
+    login(cliente)
+    d = cliente.get(f"/api/avance/{VIERNES}").get_json()
+    assert d["actual"] == "turnos" and d["total"] == 11
+    assert pasos(d)["vivo"] == "hecho"          # el horario ya pasó: se marca solo
+
+
+def test_pasos_automaticos_con_datos_del_sistema(app, cliente):
+    login(cliente)
+    with app.app_context():
+        ana = Integrante(nombre="Ana", correo="ana@gmail.com")
+        db.session.add(ana)
+        db.session.commit()
+        db.session.add(Turno(fecha=VIERNES, rol="dirige", integrante_id=ana.id))
+        db.session.add(Grabacion(nombre="evento.mkv", fecha_evento=VIERNES, estado="lista"))
+        reel_id = crear_paquete("reel", VIERNES, "Reel 1").id
+        crear_paquete("carrusel", VIERNES, "Invitación")
+        db.session.commit()
+    d = cliente.get(f"/api/avance/{VIERNES}").get_json()
+    p = pasos(d)
+    assert p["turnos"] == p["grabacion"] == p["reels"] == p["carrusel"] == "hecho"
+    assert p["bandeja"] == "pendiente"
+    assert d["actual"] == "prepara"             # el único que solo se marca a mano va primero
+    with app.app_context():
+        from app.modelos import Paquete
+        for x in Paquete.query.all():
+            x.estado = "aprobado" if x.id == reel_id else "rechazado"
+        db.session.add(Publicacion(paquete_id=reel_id, red="tiktok", estado="listo_manual"))
+        db.session.commit()
+    p = pasos(cliente.get(f"/api/avance/{VIERNES}").get_json())
+    assert p["bandeja"] == "hecho" and p["publicacion"] == "hecho" and p["redes"] == "pendiente"
+
+
+def test_no_se_puede_brincar_un_paso(cliente):
+    login(cliente)
+    r = enviar(cliente, f"/api/avance/{VIERNES}/prepara", {"accion": "hecho"}, metodo="put")
+    assert r.status_code == 409 and "no se brinca" in r.get_json()["error"]
+
+
+def test_marcar_omitir_y_deshacer(cliente):
+    login(cliente)
+    r = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "omitir", "nota": "Sin equipo aún"}, metodo="put")
+    d = r.get_json()
+    assert r.status_code == 200 and pasos(d)["turnos"] == "omitido" and d["actual"] == "prepara"
+    turnos = next(p for p in d["pasos"] if p["id"] == "turnos")
+    assert turnos["manual"] and turnos["detalle"] == "Sin equipo aún" and turnos["quien"] == "Gonza"
+    d = enviar(cliente, f"/api/avance/{VIERNES}/prepara", {"accion": "hecho"}, metodo="put").get_json()
+    assert d["actual"] == "grabacion"
+    d = enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "deshacer"}, metodo="put").get_json()
+    assert d["actual"] == "turnos"
+
+
+def test_datos_no_validos(cliente):
+    login(cliente)
+    assert cliente.get("/api/avance/2026-10-17").status_code == 400            # sábado
+    assert enviar(cliente, f"/api/avance/{VIERNES}/otro", {"accion": "hecho"}, metodo="put").status_code == 400
+    assert enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "borrar"}, metodo="put").status_code == 400
+    assert enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "hecho", "nota": "x" * 201}, metodo="put").status_code == 400
+
+
+def test_evento_activo_es_el_mas_antiguo_sin_terminar(cliente):
+    login(cliente)
+    d = cliente.get("/api/avance/activo").get_json()
+    assert d["fecha"] == "2026-10-09"           # el viernes de hace 8 días sigue sin terminar
+
+
+def test_sin_sesion(cliente):
+    assert cliente.get("/api/avance/activo").status_code == 401
+    assert cliente.get("/api/reportes").status_code == 401
+
+
+def test_reporte_semanal_con_datos_y_que_mejorar(app, cliente):
+    login(cliente)
+    with app.app_context():
+        ana = Integrante(nombre="Ana", correo="ana@gmail.com")
+        db.session.add(ana)
+        db.session.commit()
+        db.session.add(Turno(fecha=VIERNES, rol="dirige", integrante_id=ana.id))
+        reel = crear_paquete("reel", VIERNES, "Reel 1")
+        reel.estado = "aprobado"
+        db.session.add(Publicacion(paquete_id=reel.id, red="youtube", estado="publicado"))
+        db.session.add(Publicacion(paquete_id=reel.id, red="tiktok", estado="error"))
+        db.session.commit()
+    r = enviar(cliente, "/api/reportes/generar", {"semana": "2026-10-14"})
+    datos = r.get_json()["reporte"]
+    assert r.status_code == 200 and datos["semana"] == "2026-10-12"            # se ajusta al lunes
+    assert datos["totales"]["eventos"] == 2 and datos["totales"]["publicadas"] == 1
+    assert datos["equipo"] == {"Ana": {"dirige": 1, "apoya": 0}}
+    viernes = next(e for e in datos["eventos"] if e["fecha"] == "2026-10-16")
+    assert viernes["dirige"] == "Ana" and viernes["reels"] == 1
+    textos = " ".join(datos["mejorar"])
+    assert "lunes 12 de octubre no tuvo a nadie" in textos and "TikTok: 1 publicación falló" in textos
+    assert "Captura los seguidores" in textos
+    # El paso 11 de ese evento queda hecho y el reporte aparece en la lista
+    assert pasos(cliente.get(f"/api/avance/{VIERNES}").get_json())["mides"] == "hecho"
+    assert cliente.get("/api/reportes").get_json()["reportes"][0]["semana"] == "2026-10-12"
+    assert cliente.get("/api/reportes/2026-10-12").status_code == 200
+    assert cliente.get("/api/reportes/2026-10-05").status_code == 404
+
+
+def test_reporte_no_acepta_semana_futura(cliente):
+    login(cliente)
+    assert enviar(cliente, "/api/reportes/generar", {"semana": "2026-11-02"}).status_code == 400
+
+
+def test_seguidores_y_meta(app, cliente):
+    login(cliente)
+    r = enviar(cliente, "/api/seguidores", {"instagram": 120, "facebook": 380}, metodo="put")
+    assert r.status_code == 200 and r.get_json()["seguidores"]["facebook"]["cantidad"] == 380
+    assert enviar(cliente, "/api/seguidores", {"instagram": -1}, metodo="put").status_code == 400
+    assert enviar(cliente, "/api/seguidores", {"myspace": 3}, metodo="put").status_code == 400
+    assert enviar(cliente, "/api/seguidores", {"instagram": True}, metodo="put").status_code == 400
+    with app.app_context():
+        datos = reporte.generar(date(2026, 10, 17)).datos
+    assert datos["seguidores"]["total"] == 500 and datos["seguidores"]["avance_pct"] == 50
+    assert any("Faltan 500 seguidores" in m for m in datos["mejorar"])
+
+
+def test_tarea_semanal_reporta_la_semana_anterior(app, monkeypatch):
+    monkeypatch.setattr(fechas, "hoy_cdmx", lambda: date(2026, 10, 19))
+    with app.app_context():
+        semana = reporte.tarea_semanal()
+        assert semana == LUNES_SEMANA and db.session.get(Reporte, LUNES_SEMANA)

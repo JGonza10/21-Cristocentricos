@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from .bandeja import conteos
 from .extensiones import db
-from .modelos import EstadoAgente, Grabacion, Paquete, Publicacion, ahora
+from .modelos import EstadoAgente, Grabacion, Paquete, Publicacion, Reporte, ahora
 from .seguridad import login_requerido
 
 bp = Blueprint("panel", __name__, url_prefix="/api")
@@ -17,6 +17,7 @@ AGENTES = {
     "reels": "Reels",
     "publicacion": "Publicación",
     "turnos": "Turnos",
+    "reporte": "Reporte semanal",
 }
 LATIDO_MAX = timedelta(minutes=3)
 
@@ -35,6 +36,12 @@ def _por_red() -> dict:
     return resultado
 
 
+def _ultimo_reporte() -> dict | None:
+    r = Reporte.query.order_by(Reporte.semana.desc()).first()
+    return {"semana": r.semana.isoformat(), "titulo": r.datos.get("titulo"),
+            "mejorar": len(r.datos.get("mejorar", []))} if r else None
+
+
 @bp.get("/estado")
 @login_requerido
 def estado():
@@ -49,6 +56,7 @@ def estado():
         grabaciones_conteo=_contar(Grabacion.estado),
         publicaciones_conteo=_contar(Publicacion.estado),
         publicaciones_por_red=_por_red(),
+        ultimo_reporte=_ultimo_reporte(),
         worker_activo=activo,
         agentes=[{**(registros[n].a_dict() if n in registros else {"nombre": n}), "titulo": t}
                  for n, t in AGENTES.items() if n != "worker"],

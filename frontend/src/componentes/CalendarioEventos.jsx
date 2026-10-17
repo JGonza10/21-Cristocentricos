@@ -1,7 +1,8 @@
-// Calendario del mes con los eventos (lunes y viernes). Al elegir un día se asignan sus turnos ahí mismo.
+// Calendario del mes con los eventos (lunes y viernes) y las personas del equipo. Se abre en una ventana
+// desde Inicio. Al elegir un día se asignan sus turnos ahí mismo; al lado se ve quién lleva cuántos turnos.
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { ahoraCDMX, claveFecha, esDiaDeEvento, infoEvento, proximoEvento } from '../evento.js'
+import { ahoraCDMX, claveFecha, esDiaDeEvento, fechaCorta, infoEvento, proximoEvento } from '../evento.js'
 import { fechaDeClave } from '../util.js'
 import Turnos from './Turnos.jsx'
 
@@ -18,16 +19,18 @@ function diasDelMes(anio, mes) {
   return Array.from({ length: semanas * 7 }, (_, i) => new Date(inicio.getTime() + i * DIA_MS))
 }
 
-const primerNombre = (t) => t?.dirige?.nombre.split(' ')[0]
+const primerNombre = (i) => i?.nombre.split(' ')[0]
 
-export default function CalendarioEventos({ ir, alCambiar }) {
+export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
   const hoy = ahoraCDMX()
-  const [mes, setMes] = useState({ anio: hoy.getUTCFullYear(), mes: hoy.getUTCMonth() })
+  const inicial = fechaInicial ? fechaDeClave(fechaInicial) : hoy
+  const [mes, setMes] = useState({ anio: inicial.getUTCFullYear(), mes: inicial.getUTCMonth() })
   const [turnos, setTurnos] = useState({})
-  const [elegido, setElegido] = useState(() => proximoEvento()?.clave ?? null)
+  const [elegido, setElegido] = useState(() => fechaInicial ?? proximoEvento()?.clave ?? null)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [version, setVersion] = useState(0) // para que el panel del equipo se recargue
 
   const dias = diasDelMes(mes.anio, mes.mes)
   const desde = claveFecha(dias[0])
@@ -46,6 +49,11 @@ export default function CalendarioEventos({ ir, alCambiar }) {
       const d = new Date(Date.UTC(anio, m + n, 1))
       return { anio: d.getUTCFullYear(), mes: d.getUTCMonth() }
     })
+  }
+
+  function irHoy() {
+    setMes({ anio: hoy.getUTCFullYear(), mes: hoy.getUTCMonth() })
+    setElegido(proximoEvento()?.clave ?? null)
   }
 
   async function repartir() {
@@ -72,56 +80,157 @@ export default function CalendarioEventos({ ir, alCambiar }) {
   const yaPaso = info && (info.estado === 'pasado' || info.estado === 'hoy-terminado')
 
   return (
-    <section className="tarjeta" id="calendario">
-      <div className="cal-cabeza">
-        <span className="etiqueta">Calendario de eventos</span>
-        <div className="cal-nav">
-          <button className="btn suave chico" onClick={() => mover(-1)} aria-label="Mes anterior">‹</button>
-          <b className="cal-mes" aria-live="polite">{MESES[mes.mes]} {mes.anio}</b>
-          <button className="btn suave chico" onClick={() => mover(1)} aria-label="Mes siguiente">›</button>
+    <div className="cal-ventana">
+      <div className="cal-principal">
+        <div className="cal-cabeza">
+          <div className="cal-nav">
+            <button className="btn suave chico" onClick={() => mover(-1)} aria-label="Mes anterior">‹</button>
+            <b className="cal-mes" aria-live="polite">{MESES[mes.mes]} {mes.anio}</b>
+            <button className="btn suave chico" onClick={() => mover(1)} aria-label="Mes siguiente">›</button>
+          </div>
+          <button className="btn suave chico" onClick={irHoy}>Hoy</button>
         </div>
-      </div>
 
-      <div className="cal" role="grid" aria-label={`Eventos de ${MESES[mes.mes]} ${mes.anio}`}>
-        {CABECERA.map((c) => <div key={c} className="cal-dia-nombre" role="columnheader">{c}</div>)}
-        {dias.map((d) => {
-          const clave = claveFecha(d)
-          const fuera = d.getUTCMonth() !== mes.mes
-          const esHoy = clave === claveFecha(hoy)
-          if (!esDiaDeEvento(d)) {
-            return <div key={clave} className={`cal-celda ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`} role="gridcell"><span className="cal-num">{d.getUTCDate()}</span></div>
-          }
-          const t = turnos[clave]
-          const i = infoEvento(d)
-          const pasado = i.estado === 'pasado' || i.estado === 'hoy-terminado'
-          const tono = pasado ? 'pasado' : t?.dirige ? 'asignado' : 'hueco'
-          return (
-            <button key={clave} role="gridcell" aria-selected={elegido === clave}
-              className={`cal-celda evento ${tono} ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`}
-              onClick={() => { setElegido(clave); setAviso('') }}
-              aria-label={`${i.nombre}: ${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}`}>
-              <span className="cal-num">{d.getUTCDate()}</span>
-              <span className="cal-quien">{t ? (primerNombre(t) ?? (pasado ? '' : 'Sin asignar')) : '…'}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="cal-pie">
-        <span className="cal-leyenda"><i className="asignado" />Asignado</span>
-        <span className="cal-leyenda"><i className="hueco" />Sin asignar</span>
-        <span className="cal-leyenda"><i className="pasado" />Ya pasó</span>
-        <button className="btn suave chico" onClick={repartir} disabled={ocupado}>Llenar huecos automáticamente</button>
-      </div>
-      {aviso && <p className="chico-texto" role="status">{aviso}</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-
-      {info && (
-        <div className="cal-detalle">
-          <h3>{info.nombre} <span className="muted">· {info.misterios} · {info.faltan}</span></h3>
-          <Turnos key={elegido} clave={elegido} yaPaso={yaPaso} ir={ir} alGuardar={guardado} />
+        <div className="cal" role="grid" aria-label={`Eventos de ${MESES[mes.mes]} ${mes.anio}`}>
+          {CABECERA.map((c) => <div key={c} className="cal-dia-nombre" role="columnheader">{c}</div>)}
+          {dias.map((d) => {
+            const clave = claveFecha(d)
+            const fuera = d.getUTCMonth() !== mes.mes
+            const esHoy = clave === claveFecha(hoy)
+            if (!esDiaDeEvento(d)) {
+              return <div key={clave} className={`cal-celda ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`} role="gridcell"><span className="cal-num">{d.getUTCDate()}</span></div>
+            }
+            const t = turnos[clave]
+            const i = infoEvento(d)
+            const pasado = i.estado === 'pasado' || i.estado === 'hoy-terminado'
+            const tono = pasado ? 'pasado' : t?.dirige ? 'asignado' : 'hueco'
+            return (
+              <button key={clave} role="gridcell" aria-selected={elegido === clave}
+                className={`cal-celda evento ${tono} ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`}
+                onClick={() => { setElegido(clave); setAviso('') }}
+                aria-label={`${i.nombre}: ${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}${t?.apoyan.length ? `, apoya ${t.apoyan.map((x) => x.nombre).join(', ')}` : ''}`}>
+                <span className="cal-num">{d.getUTCDate()}</span>
+                {t ? (
+                  <>
+                    <span className="cal-quien">{primerNombre(t.dirige) ?? (pasado ? '' : 'Sin asignar')}</span>
+                    {t.apoyan.length > 0 && <span className="cal-apoya">+ {t.apoyan.map(primerNombre).join(', ')}</span>}
+                  </>
+                ) : <span className="cal-quien">…</span>}
+              </button>
+            )
+          })}
         </div>
+
+        <div className="cal-pie">
+          <span className="cal-leyenda"><i className="asignado" />Asignado</span>
+          <span className="cal-leyenda"><i className="hueco" />Sin asignar</span>
+          <span className="cal-leyenda"><i className="pasado" />Ya pasó</span>
+          <button className="btn suave chico" onClick={repartir} disabled={ocupado}>Llenar huecos automáticamente</button>
+        </div>
+        {aviso && <p className="chico-texto" role="status">{aviso}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
+
+        {info && (
+          <div className="cal-detalle">
+            <h3>{info.nombre} <span className="muted">· {info.misterios} · {info.faltan}</span></h3>
+            <Turnos key={elegido} clave={elegido} yaPaso={yaPaso} ir={ir} alGuardar={(c, t) => { guardado(c, t); setVersion((v) => v + 1) }} />
+          </div>
+        )}
+      </div>
+
+      <EquipoDelMes turnos={turnos} mes={mes} version={version} alCambiar={() => { setVersion((v) => v + 1); alCambiar?.() }} />
+    </div>
+  )
+}
+
+/** Personas del equipo: cuántos turnos llevan este mes, su próximo turno y alta rápida. */
+function EquipoDelMes({ turnos, mes, version, alCambiar }) {
+  const [gente, setGente] = useState(null)
+  const [nombre, setNombre] = useState('')
+  const [correo, setCorreo] = useState('')
+  const [dirige, setDirige] = useState(true)
+  const [aviso, setAviso] = useState(false)
+  const [error, setError] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  useEffect(() => {
+    api('/api/equipo').then((d) => setGente(d.integrantes.filter((i) => i.activo))).catch((e) => setError(e.message))
+  }, [version])
+
+  const hoyClave = claveFecha(ahoraCDMX())
+  const conteo = {}
+  for (const [clave, t] of Object.entries(turnos)) {
+    const f = fechaDeClave(clave)
+    const delMes = f.getUTCMonth() === mes.mes
+    for (const [rol, lista] of [['dirige', t.dirige ? [t.dirige] : []], ['apoya', t.apoyan]]) {
+      for (const p of lista) {
+        const c = conteo[p.id] ??= { dirige: 0, apoya: 0, proximo: null }
+        if (delMes) c[rol] += 1
+        if (clave >= hoyClave && (!c.proximo || clave < c.proximo)) c.proximo = clave
+      }
+    }
+  }
+
+  async function agregar(e) {
+    e.preventDefault()
+    setOcupado(true)
+    setError('')
+    setMensaje('')
+    try {
+      await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige, aviso } })
+      setMensaje(`${nombre} ya está en el equipo.`)
+      setNombre('')
+      setCorreo('')
+      setAviso(false)
+      alCambiar()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <aside className="cal-equipo" aria-label="Personas del equipo">
+      <h3>Equipo</h3>
+      {gente === null && !error && <p className="chico-texto">Cargando…</p>}
+      {gente?.length === 0 && <p className="chico-texto">Todavía no hay integrantes. Agrega al primero aquí abajo.</p>}
+      {gente?.length > 0 && (
+        <ul className="cal-gente">
+          {gente.map((i) => {
+            const c = conteo[i.id] ?? { dirige: 0, apoya: 0, proximo: null }
+            return (
+              <li key={i.id}>
+                <span className="cal-av" aria-hidden="true">{i.nombre.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
+                <div>
+                  <b>{i.nombre}</b>
+                  <span className="chico-texto">
+                    {c.dirige} dirige · {c.apoya} apoya este mes{!i.puede_dirigir && ' · solo apoya'}
+                  </span>
+                  <span className="chico-texto">{c.proximo ? `Próximo: ${fechaCorta(fechaDeClave(c.proximo))}` : 'Sin turnos próximos'}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
-    </section>
+      <form className="formulario cal-alta" onSubmit={agregar}>
+        <h3>Agregar persona</h3>
+        <div className="campo">
+          <label htmlFor="cal-nombre">Nombre</label>
+          <input id="cal-nombre" value={nombre} maxLength={80} required autoComplete="off" onChange={(e) => setNombre(e.target.value)} />
+        </div>
+        <div className="campo">
+          <label htmlFor="cal-correo">Correo (para su calendario)</label>
+          <input id="cal-correo" type="email" value={correo} maxLength={120} required autoComplete="off" inputMode="email" onChange={(e) => setCorreo(e.target.value)} />
+        </div>
+        <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir</label>
+        <label className="casilla"><input type="checkbox" checked={aviso} required onChange={(e) => setAviso(e.target.checked)} /> Le informé el aviso de privacidad (texto completo en Ajustes)</label>
+        {error && <p className="error" role="alert">{error}</p>}
+        {mensaje && <p className="chico-texto" role="status">{mensaje}</p>}
+        <button className="btn chico" type="submit" disabled={ocupado}>Agregar</button>
+      </form>
+    </aside>
   )
 }

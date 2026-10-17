@@ -1,5 +1,7 @@
-// Diagrama del flujo estilo lienzo (como la guía): recuadros por tipo, conexiones curvas, reproductor paso a paso
-// y, encima, el estado en vivo de cada recuadro que el sistema conoce.
+// Diagrama del flujo estilo lienzo (como la guía). Se ajusta al ancho disponible.
+//   Modo avance (normal): marca los pasos hechos, omitidos y el paso en el que va el evento.
+//   Modo recorrido («Ver cómo funciona»): pasa solo por los 11 pasos explicando cada uno.
+// Encima, una marca roja avisa de errores en vivo (publicación fallida, grabación con error…).
 import { useEffect, useRef, useState } from 'react'
 import { CONEXIONES, ESTADOS, LIENZO, NODOS, QUIEN } from '../pasos.js'
 import '../styles/lienzo.css'
@@ -21,6 +23,7 @@ function geometria(c) {
     d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`,
     punta: `${xt},${y2} ${xt - 9},${y2 - 5.5} ${xt - 9},${y2 + 5.5}`,
     a: [x1, y1], b: [B.x - mitad(B), y2],
+    medio: [(x1 + x1 + dx + x2 - dx + x2) / 4, (y1 + y1 + y2 + y2) / 4],
   }
 }
 const GEO = Object.fromEntries(CONEXIONES.map((c) => [c.id, geometria(c)]))
@@ -51,138 +54,126 @@ function Iconos() {
   )
 }
 
-export default function Flujo({ pasos, nodosVivo, trabajando, alVerTarjeta }) {
-  const lienzo = useRef(null)
-  const [paso, setPaso] = useState(null) // null = vista general con el estado en vivo
-  const [jugando, setJugando] = useState(false)
+export default function Flujo({ pasos, nodosVivo, avance, actual, grande = false, alElegirPaso }) {
+  const [recorrido, setRecorrido] = useState(null) // índice del paso explicado, o null = modo avance
   const quieto = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-  const pasoDe = (idNodo) => pasos.findIndex((p) => p.n.includes(idNodo))
-  const pasoDeCx = (idCx) => pasos.findIndex((p) => p.v.includes(idCx))
+  const indice = Object.fromEntries(pasos.map((p, i) => [p.id, i]))
+  const pasoDeNodo = Object.fromEntries(pasos.flatMap((p) => p.n.map((n) => [n, p.id])))
+  const pasoDeCx = Object.fromEntries(pasos.flatMap((p) => p.v.map((v) => [v, p.id])))
 
   useEffect(() => {
-    if (!jugando) return undefined
-    const t = setTimeout(() => {
-      if (paso >= pasos.length - 1) setJugando(false)
-      else setPaso(paso + 1)
-    }, DURACION_PASO)
+    if (recorrido === null) return undefined
+    const t = setTimeout(() => setRecorrido(recorrido >= pasos.length - 1 ? null : recorrido + 1), DURACION_PASO)
     return () => clearTimeout(t)
-  }, [jugando, paso, pasos.length])
+  }, [recorrido, pasos.length])
 
-  useEffect(() => {
-    if (paso === null || !lienzo.current) return
-    const xs = pasos[paso].n.map((id) => PORID[id].x)
-    const cx = (Math.min(...xs) + Math.max(...xs)) / 2
-    const el = lienzo.current
-    const escala = el.scrollWidth / LIENZO.ancho
-    el.scrollTo?.({ left: Math.max(0, cx * escala - el.clientWidth / 2), behavior: quieto ? 'auto' : 'smooth' })
-  }, [paso, pasos, quieto])
-
-  function ir(i) { setJugando(false); setPaso(i) }
-  function ejecutar() {
-    if (jugando) { setJugando(false); return }
-    setPaso(paso === null || paso >= pasos.length - 1 ? 0 : paso)
-    setJugando(true)
+  // Fase de cada paso: en modo recorrido según el paso explicado; en modo avance según el evento.
+  function fase(idPaso) {
+    if (!idPaso) return ''
+    if (recorrido !== null) {
+      const i = indice[idPaso]
+      return i < recorrido ? 'hecho' : i === recorrido ? 'actual' : 'futuro'
+    }
+    if (idPaso === actual) return 'actual'
+    return avance?.[idPaso] === 'hecho' ? 'hecho' : avance?.[idPaso] === 'omitido' ? 'omitido' : 'futuro'
   }
 
-  const actual = paso === null ? null : pasos[paso]
+  const explicado = recorrido === null ? null : pasos[recorrido]
 
   return (
-    <>
+    <div className={`flujo-caja ${grande ? 'grande' : ''}`}>
       <div className="lienzo-barra">
-        <div className="lienzo-nombre"><b>Flujo del evento</b>
-          {trabajando ? <span className="pill-vivo">Activo</span> : <span className="pill-vivo off">Agentes apagados</span>}
-        </div>
-        <div className="botones-fila">
-          {paso !== null && <button className="btn suave chico" onClick={() => { setJugando(false); setPaso(null) }}>Ver estado en vivo</button>}
-          <button className="btn chico" onClick={ejecutar}>{jugando ? 'Pausar' : paso === pasos.length - 1 ? 'Ejecutar otra vez' : 'Ejecutar flujo'}</button>
-        </div>
+        <b>{recorrido === null ? 'Avance del evento' : 'Cómo funciona'}</b>
+        <button className="btn suave chico" onClick={() => setRecorrido(recorrido === null ? 0 : null)}>
+          {recorrido === null ? 'Ver cómo funciona' : 'Volver a mi avance'}
+        </button>
       </div>
-      <div className={`lienzo ${paso === null ? 'general' : 'enfocado'} ${trabajando ? 'trabajando' : ''}`} ref={lienzo} tabIndex={0}
-        aria-label="Lienzo del flujo. Se desliza hacia los lados.">
+      <div className={`lienzo ${recorrido === null ? 'modo-avance' : 'modo-recorrido'}`} tabIndex={grande ? 0 : undefined}
+        aria-label={grande ? 'Lienzo del flujo. En pantallas angostas se desliza hacia los lados.' : undefined}>
         <svg className="lienzo-svg" viewBox={`0 0 ${LIENZO.ancho} ${LIENZO.alto}`} role="img"
-          aria-label="Flujo del evento: turnos, preparación con Claude, evento en vivo, grabación, agentes de reels y carrusel, bandeja de aprobación, agente de publicación, cinco redes y hoja de registro.">
+          aria-label="Flujo del evento en 11 pasos: turnos, preparación, evento en vivo, grabación, reels, carrusel, bandeja, publicación, redes, hoja de registro y reporte semanal.">
           <Iconos />
           {CONEXIONES.map((c) => {
-            const s = pasoDeCx(c.id)
-            const fase = paso === null ? '' : s < paso && s >= 0 ? 'hecha' : s === paso ? 'viva' : ''
-            const vivaEnVivo = paso === null && trabajando && (nodosVivo[c.a]?.estado === 'activo' || nodosVivo[c.b]?.estado === 'activo')
+            const f = fase(pasoDeCx[c.id])
             const g = GEO[c.id]
+            const ancho = c.l ? c.l.length * 6.3 + 18 : 0
             return (
-              <g key={c.id} className={`cx ${c.fija ? 'fija' : ''} ${fase} ${vivaEnVivo ? 'viva' : ''}`}>
+              <g key={c.id} className={`cx ${c.fija ? 'fija' : ''} ${f === 'hecho' || f === 'omitido' ? 'hecha' : ''} ${f === 'actual' ? 'viva' : ''}`}>
                 <path className="l" d={g.d} />
                 <polygon points={g.punta} />
                 <circle className="asa" cx={g.a[0]} cy={g.a[1]} r="5" />
                 <circle className="asa" cx={g.b[0]} cy={g.b[1]} r="5" />
-                {c.l && <Etiqueta texto={c.l} d={g.d} />}
-                {fase === 'viva' && !quieto && <Punto key={paso} d={g.d} />}
+                {c.l && (
+                  <g className="pill">
+                    <rect x={g.medio[0] - ancho / 2} y={g.medio[1] - 11} width={ancho} height="22" rx="11" />
+                    <text x={g.medio[0]} y={g.medio[1] + 4}>{c.l}</text>
+                  </g>
+                )}
+                {f === 'actual' && recorrido !== null && !quieto && <Punto key={recorrido} />}
               </g>
             )
           })}
           {NODOS.map((n) => {
             const h = mitad(n)
-            const s = pasoDe(n.id)
-            const fase = paso === null ? '' : s < paso ? 'hecho' : s === paso ? 'actual' : ''
+            const idPaso = pasoDeNodo[n.id]
+            const f = fase(idPaso)
             const vivo = nodosVivo[n.id]
+            const error = vivo?.estado === 'error'
+            const paso = pasos[indice[idPaso]]
+            const texto = f === 'hecho' ? 'Hecho' : f === 'omitido' ? 'Omitido' : f === 'actual' ? 'Paso actual' : 'Pendiente'
             return (
-              <g key={n.id} className={`nodo d-${n.k} ${fase} ${vivo?.estado ? `v-${vivo.estado}` : ''}`} transform={`translate(${n.x},${n.y})`}
-                tabIndex={0} role="button" aria-label={`${n.t}. ${n.s}${vivo?.estado ? `. ${ESTADOS[vivo.estado]}: ${vivo.corto}` : ''}`}
-                onClick={() => s >= 0 && ir(s)} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && s >= 0) { e.preventDefault(); ir(s) } }}>
-                <rect className="anillo" x={-h - 6} y={-h - 6} width={2 * h + 12} height={2 * h + 12} rx="20" />
+              <g key={n.id} className={`nodo d-${n.k} f-${f || 'ninguna'} ${error ? 'v-error' : ''}`} transform={`translate(${n.x},${n.y})`}
+                tabIndex={0} role="button" aria-label={`Paso ${paso?.numero}: ${n.t}. ${texto}${error ? `. Error: ${vivo.corto}` : ''}`}
+                onClick={() => idPaso && alElegirPaso?.(idPaso)}
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && idPaso) { e.preventDefault(); alElegirPaso?.(idPaso) } }}>
+                <rect className="anillo" x={-h - 7} y={-h - 7} width={2 * h + 14} height={2 * h + 14} rx="20" />
                 <rect className="tile" x={-h} y={-h} width={2 * h} height={2 * h} rx="16" />
                 <use className="ico" href={`#i-${n.i}`} x={-h * 0.42} y={-h * 0.42} width={h * 0.84} height={h * 0.84} />
-                {vivo?.estado && <circle className="insignia" cx={h - 4} cy={-h + 4} r="8" />}
-                <text className="t" x="0" y={h + 22}>{n.t}</text>
-                <text className="s" x="0" y={h + 39}>{n.s}</text>
-                {vivo?.corto && <text className="vivo" x="0" y={h + 56}>{vivo.corto}</text>}
+                {error ? (
+                  <g className="marca m-error" transform={`translate(${h - 4},${-h + 4})`}><circle r="10" /><path d="M-3.5,-3.5 L3.5,3.5 M3.5,-3.5 L-3.5,3.5" /></g>
+                ) : f === 'hecho' ? (
+                  <g className="marca m-hecho" transform={`translate(${h - 4},${-h + 4})`}><circle r="10" /><path d="M-4.5,0.5 L-1.5,3.5 L4.5,-3" /></g>
+                ) : f === 'omitido' ? (
+                  <g className="marca m-omitido" transform={`translate(${h - 4},${-h + 4})`}><circle r="10" /><path d="M-4,0 L4,0" /></g>
+                ) : null}
+                <text className="t" x="0" y={h + 24}>{n.t}</text>
+                <text className="s" x="0" y={h + 42}>{n.s}</text>
               </g>
             )
           })}
         </svg>
       </div>
-      <div className="lienzo-chips" aria-label="Colores">
-        <span><i className="c-disp" />Disparador</span><span><i className="c-agente" />Agente</span><span><i className="c-humano" />Tú decides</span>
-        <span><i className="c-verde" />Sube solo</span><span><i className="c-plata" />Archivo o lo subes tú</span><span><i className="c-hab" />Se la pides a Claude</span>
-        <span className="sep">Puntos de estado:</span>
-        {Object.entries(ESTADOS).map(([k, v]) => <span key={k} className={`ley-v v-${k}`}><i />{v}</span>)}
-      </div>
 
-      <div className="panel-paso" aria-live="polite">
-        {actual ? (
-          <>
-            <span className={`quien q-${actual.q}`}>Paso {paso + 1} de {pasos.length} · {QUIEN[actual.q]}</span>
-            <h3>{actual.t}</h3>
-            <p>{actual.x}</p>
-          </>
-        ) : (
-          <>
-            <span className="quien q-solo">Estado en vivo</span>
-            <h3>Así va el trabajo ahora</h3>
-            <p>Los puntos de color sobre cada recuadro muestran cómo está. Toca un recuadro o un número para ver ese paso, o «Ejecutar flujo» para recorrerlo completo. En el celular, desliza el lienzo hacia los lados.</p>
-          </>
-        )}
-        <div className="botones-fila panel-nav">
-          <button className="btn suave chico" onClick={() => ir(Math.max(0, (paso ?? 1) - 1))} disabled={paso === null || paso === 0}>Anterior</button>
-          <button className="btn suave chico" onClick={() => ir(paso === null ? 0 : Math.min(pasos.length - 1, paso + 1))} disabled={paso === pasos.length - 1}>Siguiente</button>
-          {actual && <button className="btn suave chico" onClick={() => alVerTarjeta(actual.id)}>Ver su tarjeta</button>}
+      {explicado ? (
+        <div className="recorrido-panel" aria-live="polite">
+          <span className={`quien q-${explicado.q}`}>Paso {recorrido + 1} de {pasos.length} · {QUIEN[explicado.q]}</span>
+          <h3>{explicado.t}</h3>
+          <p>{explicado.x}</p>
+          <div className="botones-fila">
+            <button className="btn suave chico" onClick={() => setRecorrido(Math.max(0, recorrido - 1))} disabled={recorrido === 0}>Anterior</button>
+            <button className="btn suave chico" onClick={() => setRecorrido(recorrido + 1 >= pasos.length ? null : recorrido + 1)}>
+              {recorrido + 1 >= pasos.length ? 'Terminar' : 'Siguiente'}
+            </button>
+          </div>
         </div>
-        <div className="numeros" role="group" aria-label="Ir a un paso">
-          {pasos.map((p, i) => (
-            <button key={p.id} className={`num v-${p.estado ?? 'ninguno'}`} aria-current={paso === i ? 'step' : undefined}
-              aria-label={`Ir al paso ${i + 1}: ${p.t}`} onClick={() => ir(i)}>{i + 1}</button>
-          ))}
+      ) : (
+        <div className="lienzo-chips" aria-hidden="true">
+          <span className="ley-a hecho"><i />Hecho</span><span className="ley-a omitido"><i />Omitido</span>
+          <span className="ley-a actual"><i />Paso actual</span><span className="ley-a error"><i />{ESTADOS.error}</span>
+          <span><i className="c-humano" />Lo haces tú</span><span><i className="c-agente" />Lo hace un agente</span><span><i className="c-hab" />Se la pides a Claude</span>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   )
 }
 
-// Punto dorado que recorre la conexión una vez (como en la guía).
-function Punto({ d }) {
+// Punto dorado que recorre su conexión una vez (como en la guía).
+function Punto() {
   const ref = useRef(null)
   useEffect(() => {
     const c = ref.current
-    const guia = c.parentNode.querySelector('path.l') // la propia conexión (dibujada, para que getTotalLength funcione)
+    const guia = c.parentNode.querySelector('path.l')
     const largo = guia.getTotalLength()
     let inicio = null
     let id = 0
@@ -196,20 +187,6 @@ function Punto({ d }) {
     }
     id = requestAnimationFrame(mover)
     return () => cancelAnimationFrame(id)
-  }, [d])
+  }, [])
   return <circle ref={ref} className="punto" r="7" cx="-50" cy="-50" />
-}
-
-function Etiqueta({ texto, d }) {
-  // Punto medio aproximado de la curva (promedio de sus 4 puntos de control).
-  const nums = d.match(/-?\d+(\.\d+)?/g).map(Number)
-  const x = (nums[0] + nums[2] + nums[4] + nums[6]) / 4
-  const y = (nums[1] + nums[3] + nums[5] + nums[7]) / 4
-  const w = texto.length * 6.3 + 18
-  return (
-    <g className="pill">
-      <rect x={x - w / 2} y={y - 11} width={w} height="22" rx="11" />
-      <text x={x} y={y + 4}>{texto}</text>
-    </g>
-  )
 }

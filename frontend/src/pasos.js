@@ -1,41 +1,42 @@
 // Flujo de trabajo de Inicio: recuadros, conexiones y pasos (basado en la guía "Cristocéntricos Automático")
-// y su estado en vivo a partir de /api/estado.
-//   Estados: ok = al día · activo = trabajando · espera = te necesita · error = falló · apagado = agentes sin correr
-//            sin = todavía no existe en el sistema
+// y su estado en vivo a partir de /api/estado. El avance de cada evento (hecho / omitido / pendiente)
+// viene de /api/avance.
+//   Estados en vivo: ok = al día · activo = trabajando · espera = te necesita · error = falló
+//                    apagado = agentes sin correr · sin = todavía no existe en el sistema
 // Fuera de alcance por ahora (Gonza, 2026-10-16): Comunidad, Parroquias, Bienvenida y Respuestas.
 import { agendaEditorial, fechaCorta, infoEvento, proximoEvento } from './evento.js'
 import { fechaDeClave, fechaHora, REDES } from './util.js'
 
 // k: disp = disparador · agente · humano = tú decides · plata = archivo o lo subes tú · verde = sube solo · hab = se la pides a Claude
 export const NODOS = [
-  { id: 'n-turnos', x: 80, y: 130, k: 'humano', i: 'users', t: 'Turnos', s: 'Quién dirige y apoya' },
-  { id: 's-int', x: 250, y: 130, k: 'hab', i: 'pen', t: 'Intenciones', s: 'Lista para leer', r: 28 },
-  { id: 's-guion', x: 420, y: 130, k: 'hab', i: 'pen', t: 'Guion del vivo', s: 'Misterios del día', r: 28 },
-  { id: 's-lista', x: 590, y: 130, k: 'hab', i: 'check', t: 'Lista previa', s: 'Antes de transmitir', r: 28 },
-  { id: 'n-vivo', x: 760, y: 130, k: 'disp', i: 'bolt', t: 'Evento en vivo', s: 'Lun y vie · 10 a 11 am' },
-  { id: 'n-grab', x: 930, y: 130, k: 'plata', i: 'folder', t: 'Grabación guardada', s: 'Carpeta del proyecto' },
-  { id: 'n-a1', x: 1100, y: 130, k: 'agente', i: 'film', t: 'Agente de reels', s: '3 momentos en vertical' },
-  { id: 's-sub', x: 1270, y: 130, k: 'hab', i: 'check', t: 'Subtítulos', s: 'Revisión', r: 28 },
-  { id: 's-fech', x: 420, y: 380, k: 'hab', i: 'cal', t: 'Fechas litúrgicas', s: 'Fiestas del mes', r: 28 },
-  { id: 'n-cal', x: 590, y: 380, k: 'disp', i: 'cal', t: 'Calendario', s: '2 días antes' },
-  { id: 's-evan', x: 930, y: 380, k: 'hab', i: 'pen', t: 'Evangelio del día', s: 'Reflexión y textos', r: 28 },
-  { id: 'n-a2', x: 1100, y: 380, k: 'agente', i: 'img', t: 'Agente de carrusel', s: '5 láminas' },
-  { id: 's-rev', x: 1440, y: 315, k: 'hab', i: 'check', t: 'Revisor', s: 'Fechas, tono, formato', r: 28 },
-  { id: 'n-band', x: 1610, y: 315, k: 'humano', i: 'shield', t: 'Bandeja de aprobación', s: 'Tú decides' },
-  { id: 's-tit', x: 1610, y: 110, k: 'hab', i: 'pen', t: 'Títulos YouTube', s: 'Descripción y etiquetas', r: 28 },
-  { id: 'n-pub', x: 1790, y: 315, k: 'agente', i: 'send', t: 'Agente de publicación', s: 'Sube o deja listo lo aprobado' },
-  { id: 'n-desc', x: 1790, y: 520, k: 'plata', i: 'x', t: 'Se descarta', s: 'No se publica', r: 28 },
-  { id: 'n-ig', x: 1990, y: 45, k: 'plata', i: 'ig', t: 'Instagram', s: 'Sola con Meta', r: 30, red: 'instagram' },
-  { id: 'n-fb', x: 1990, y: 180, k: 'plata', i: 'fb', t: 'Facebook', s: 'Sola con Meta', r: 30, red: 'facebook' },
-  { id: 'n-tt', x: 1990, y: 315, k: 'plata', i: 'tt', t: 'TikTok', s: 'Subes tú', r: 30, red: 'tiktok' },
-  { id: 'n-yt', x: 1990, y: 450, k: 'verde', i: 'yt', t: 'YouTube Shorts', s: 'Sube solo*', r: 30, red: 'youtube' },
-  { id: 'n-tv', x: 1990, y: 585, k: 'plata', i: 'tv', t: 'Canal de TV', s: 'Subes tú', r: 30 },
-  { id: 's-reg', x: 1990, y: 730, k: 'hab', i: 'sheet', t: 'Registrar video', s: 'Anota la fila', r: 28 },
-  { id: 'n-hoja', x: 2190, y: 730, k: 'plata', i: 'sheet', t: 'Hoja de registro', s: 'Google Sheets', r: 30 },
-  { id: 's-rep', x: 2390, y: 670, k: 'hab', i: 'chart', t: 'Reporte semanal', s: 'Meta de 1,000', r: 28 },
-  { id: 's-res', x: 2390, y: 790, k: 'hab', i: 'pen', t: 'Resumen del vivo', s: 'Qué mejorar', r: 28 },
+  { id: 'n-turnos', x: 70, y: 130, k: 'humano', i: 'users', t: 'Turnos', s: 'Quién dirige y apoya' },
+  { id: 's-int', x: 200, y: 130, k: 'hab', i: 'pen', t: 'Intenciones', s: 'Lista para leer', r: 28 },
+  { id: 's-guion', x: 330, y: 130, k: 'hab', i: 'pen', t: 'Guion del vivo', s: 'Misterios del día', r: 28 },
+  { id: 's-lista', x: 460, y: 130, k: 'hab', i: 'check', t: 'Lista previa', s: 'Antes de transmitir', r: 28 },
+  { id: 'n-vivo', x: 600, y: 130, k: 'disp', i: 'bolt', t: 'Evento en vivo', s: 'Lun y vie · 10 a 11 am' },
+  { id: 'n-grab', x: 740, y: 130, k: 'plata', i: 'folder', t: 'Grabación', s: 'Carpeta del proyecto' },
+  { id: 'n-a1', x: 880, y: 130, k: 'agente', i: 'film', t: 'Agente de reels', s: '3 momentos en vertical' },
+  { id: 's-sub', x: 1010, y: 130, k: 'hab', i: 'check', t: 'Subtítulos', s: 'Revisión', r: 28 },
+  { id: 's-fech', x: 330, y: 380, k: 'hab', i: 'cal', t: 'Fechas litúrgicas', s: 'Fiestas del mes', r: 28 },
+  { id: 'n-cal', x: 460, y: 380, k: 'disp', i: 'cal', t: 'Calendario', s: '2 días antes' },
+  { id: 's-evan', x: 740, y: 380, k: 'hab', i: 'pen', t: 'Evangelio del día', s: 'Reflexión y textos', r: 28 },
+  { id: 'n-a2', x: 880, y: 380, k: 'agente', i: 'img', t: 'Agente de carrusel', s: '5 láminas' },
+  { id: 's-rev', x: 1140, y: 315, k: 'hab', i: 'check', t: 'Revisor', s: 'Fechas, tono, formato', r: 28 },
+  { id: 'n-band', x: 1280, y: 315, k: 'humano', i: 'shield', t: 'Bandeja', s: 'Tú decides' },
+  { id: 's-tit', x: 1280, y: 110, k: 'hab', i: 'pen', t: 'Títulos YouTube', s: 'Descripción y etiquetas', r: 28 },
+  { id: 'n-pub', x: 1440, y: 315, k: 'agente', i: 'send', t: 'Publicación', s: 'Sube o deja listo' },
+  { id: 'n-desc', x: 1440, y: 520, k: 'plata', i: 'x', t: 'Se descarta', s: 'No se publica', r: 28 },
+  { id: 'n-ig', x: 1620, y: 45, k: 'plata', i: 'ig', t: 'Instagram', s: 'Sola con Meta', r: 30, red: 'instagram' },
+  { id: 'n-fb', x: 1620, y: 180, k: 'plata', i: 'fb', t: 'Facebook', s: 'Sola con Meta', r: 30, red: 'facebook' },
+  { id: 'n-tt', x: 1620, y: 315, k: 'plata', i: 'tt', t: 'TikTok', s: 'Subes tú', r: 30, red: 'tiktok' },
+  { id: 'n-yt', x: 1620, y: 450, k: 'verde', i: 'yt', t: 'YouTube Shorts', s: 'Sube solo*', r: 30, red: 'youtube' },
+  { id: 'n-tv', x: 1620, y: 585, k: 'plata', i: 'tv', t: 'Canal de TV', s: 'Subes tú', r: 30 },
+  { id: 'n-res', x: 1800, y: 315, k: 'agente', i: 'pen', t: 'Resumen del vivo', s: 'Automático' },
+  { id: 'n-rep', x: 1950, y: 315, k: 'agente', i: 'chart', t: 'Reporte semanal', s: 'Lunes 8 am, solo' },
+  { id: 's-reg', x: 1620, y: 740, k: 'hab', i: 'sheet', t: 'Registrar video', s: 'Anota la fila', r: 28 },
+  { id: 'n-hoja', x: 1800, y: 740, k: 'plata', i: 'sheet', t: 'Hoja de registro', s: 'Google Sheets', r: 30 },
 ]
-export const LIENZO = { ancho: 2500, alto: 880 }
+export const LIENZO = { ancho: 2040, alto: 860 }
 
 export const CONEXIONES = [
   { id: 'h0', a: 'n-turnos', b: 's-int' },
@@ -51,21 +52,23 @@ export const CONEXIONES = [
   { id: 'h11', a: 's-tit', b: 'n-pub' },
   { id: 'p7a', a: 'n-pub', b: 'n-ig' }, { id: 'p7b', a: 'n-pub', b: 'n-fb' }, { id: 'p7c', a: 'n-pub', b: 'n-tt' },
   { id: 'p7d', a: 'n-pub', b: 'n-yt' }, { id: 'p7e', a: 'n-pub', b: 'n-tv' },
+  { id: 'c1', a: 'n-ig', b: 'n-res' }, { id: 'c2', a: 'n-fb', b: 'n-res' }, { id: 'c3', a: 'n-tt', b: 'n-res' },
+  { id: 'c4', a: 'n-yt', b: 'n-res' }, { id: 'c5', a: 'n-tv', b: 'n-res' },
+  { id: 'r1', a: 'n-res', b: 'n-rep', l: 'Cada lunes' },
   { id: 'h15', a: 'n-pub', b: 's-reg', l: '1 fila' }, { id: 'h16', a: 's-reg', b: 'n-hoja' },
-  { id: 'h17', a: 'n-hoja', b: 's-rep' }, { id: 'h18', a: 'n-hoja', b: 's-res' },
 ]
 
 // q: tu = lo haces tú · solo = se hace solo · hab = Claude te ayuda
 export const PASOS = [
   { id: 'turnos', n: ['n-turnos'], v: [], q: 'tu', t: 'Asignas quién dirige y quién apoya',
-    x: 'En el calendario de abajo eliges quién dirige y quién apoya cada evento. Los huecos se reparten solos cada domingo a las 6 pm y a cada quien le llega la invitación a su calendario.' },
+    x: 'Eliges en el calendario quién dirige y quién apoya el evento. Los huecos se reparten solos cada domingo a las 6 pm y a cada quien le llega la invitación a su calendario.' },
   { id: 'prepara', n: ['s-int', 's-guion', 's-lista'], v: ['h0', 'h1', 'h2', 'h3'], q: 'hab', t: 'Preparas el evento con ayuda de Claude',
     x: 'Antes del vivo le pides a Claude tres cosas: ordenar las intenciones (sin nombres si no hay permiso), armar el guion del día con los misterios que tocan y repasar la lista de audio, StreamYard, grabación y reloj.' },
   { id: 'vivo', n: ['n-vivo'], v: [], q: 'tu', t: 'Se transmite el evento',
     x: 'Es el disparador del flujo. Transmites en vivo de 10 a 11 de la mañana y tu forma de transmitir no cambia.' },
   { id: 'grabacion', n: ['n-grab'], v: ['p1'], q: 'solo', t: 'La grabación se guarda',
     x: 'OBS o StreamYard guardan el video completo en la carpeta grabaciones. Se configura una sola vez.' },
-  { id: 'reels', n: ['n-a1', 's-sub'], v: ['p2', 'h4'], q: 'solo', t: 'El agente de reels trabaja y se revisan los subtítulos',
+  { id: 'reels', n: ['n-a1', 's-sub'], v: ['p2', 'h4'], q: 'solo', t: 'El agente de reels trabaja',
     x: 'Whisper escucha el video, el agente elige 3 momentos de menos de un minuto, los pone en vertical y les quema subtítulos. Si quieres, Claude revisa palabras mal escuchadas y cortes de línea.' },
   { id: 'carrusel', n: ['s-fech', 'n-cal', 's-evan', 'n-a2'], v: ['h5', 'h6', 'h7'], q: 'solo', t: 'El agente de carrusel trabaja',
     x: 'El calendario lo despierta 2 días antes de cada lunes y viernes y prepara 5 imágenes: invitación con fecha y hora, misterios del día, transmisión en vivo, intenciones y cierre. Claude te puede ayudar con las fechas litúrgicas y la reflexión del Evangelio.' },
@@ -76,15 +79,16 @@ export const PASOS = [
   { id: 'redes', n: ['n-ig', 'n-fb', 'n-tt', 'n-yt', 'n-tv'], v: ['p7a', 'p7b', 'p7c', 'p7d', 'p7e'], q: 'tu', t: 'Llega a las cinco redes',
     x: 'YouTube sube solo (en privado hasta que Google verifique la aplicación). Instagram y Facebook suben solos con Meta conectado. TikTok y el Canal de TV los subes tú desde su carpeta, en unos 2 minutos.' },
   { id: 'registro', n: ['s-reg', 'n-hoja'], v: ['h15', 'h16'], q: 'tu', t: 'Anotas el video en la hoja de registro',
-    x: 'Claude arma la fila con nombre, fecha, duración, reels, carrusel y redes y la escribe en la hoja de Google Sheets. La hoja todavía no está conectada al sistema.' },
-  { id: 'mides', n: ['s-rep', 's-res'], v: ['h17', 'h18'], q: 'hab', t: 'Mides y mejoras',
-    x: 'Con la hoja, Claude te prepara el reporte semanal contra la meta de 1,000 seguidores y el resumen de cada transmisión: qué funcionó y qué mejorar.' },
+    x: 'Claude arma la fila con nombre, fecha, duración, reels, carrusel y redes y la escribe en la hoja de Google Sheets. La hoja todavía no está conectada al sistema: mientras tanto, omite este paso.' },
+  { id: 'mides', n: ['n-res', 'n-rep'], v: ['c1', 'c2', 'c3', 'c4', 'c5', 'r1'], q: 'solo', t: 'El sistema arma el reporte semanal',
+    x: 'Cada lunes a las 8 am el sistema arma solo, sin Claude, el reporte de la semana: resumen de cada evento, quién dirigió y apoyó, qué se aprobó, cómo quedó cada red, seguidores contra la meta de 1,000 y qué mejorar.' },
 ]
 
 export const QUIEN = { tu: 'Lo haces tú', solo: 'Se hace solo', hab: 'Claude te ayuda' }
 export const ESTADOS = {
   ok: 'Al día', activo: 'Trabajando', espera: 'Te necesita', error: 'Con error', apagado: 'Apagado', sin: 'Pendiente',
 }
+export const AVANCE = { hecho: 'Hecho', omitido: 'Omitido', pendiente: 'Pendiente' }
 
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
 
@@ -160,7 +164,9 @@ export function calcularVivo(estado, turnos, ahora = new Date()) {
         resumen: redes.map((x) => `${REDES[x.red]}: ${x.v.corto}`).join(' · ') + '.' }
       : { estado: 'ok', corto: 'Sin publicaciones', resumen: 'Todavía no se ha publicado nada.' },
     registro: { estado: 'sin', corto: 'Sin conectar', resumen: 'La hoja de Google Sheets aún no está conectada al sistema.' },
-    mides: { resumen: 'Pídeselo a Claude cada semana.' },
+    mides: e.ultimo_reporte
+      ? { estado: agente('reporte').error ? 'error' : 'ok', corto: 'Reporte listo', resumen: `Último reporte: ${e.ultimo_reporte.titulo}.` }
+      : { estado: 'sin', corto: 'Primero el lunes', resumen: 'El primer reporte se arma solo el lunes a las 8 am. También puedes generarlo ahora.' },
   }
 
   p.turnos.detalle = [e.google ? 'Las invitaciones llegan por Google Calendar.' : 'Google Calendar sin conectar: no se envían invitaciones.', ultimaVez('turnos')]
@@ -169,6 +175,7 @@ export function calcularVivo(estado, turnos, ahora = new Date()) {
   p.reels.detalle = [proximo('Reels') && `Próximos: ${fechaCorta(proximo('Reels').fecha)}, después de las 11 am.`, ultimaVez('reels')]
   p.bandeja.detalle = [`${plural(e.bandeja?.aprobado ?? 0, 'aprobado', 'aprobados')} · ${plural(e.bandeja?.rechazado ?? 0, 'rechazado', 'rechazados')}`]
   p.publicacion.detalle = [e.meta ? 'Facebook e Instagram conectados.' : 'Meta sin conectar: Facebook e Instagram quedan en su carpeta.', ultimaVez('publicacion')]
+  p.mides.detalle = [e.ultimo_reporte?.mejorar ? `${plural(e.ultimo_reporte.mejorar, 'punto', 'puntos')} en «Qué mejorar».` : null, ultimaVez('reporte')]
 
   // Sin agentes corriendo, lo automático no avanza.
   if (estado && !e.worker_activo) {
@@ -179,7 +186,7 @@ export function calcularVivo(estado, turnos, ahora = new Date()) {
 
   const nodos = {
     'n-turnos': p.turnos, 'n-vivo': p.vivo, 'n-grab': p.grabacion, 'n-a1': p.reels, 'n-a2': p.carrusel,
-    'n-band': p.bandeja, 'n-pub': p.publicacion, 'n-hoja': p.registro,
+    'n-band': p.bandeja, 'n-pub': p.publicacion, 'n-hoja': p.registro, 'n-rep': p.mides,
   }
   for (const n of NODOS) if (n.red) nodos[n.id] = porRed(n.red)
   if (!e.meta) for (const id of ['n-ig', 'n-fb']) nodos[id] ??= { estado: null, corto: 'En carpeta' }

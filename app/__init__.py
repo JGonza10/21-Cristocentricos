@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
-from . import auth, bandeja, cli, equipo, errores, panel
+from . import auth, avance, bandeja, cli, equipo, errores, panel, reportes
 from .migracion import migrar
 from .extensiones import csrf, db
 
@@ -53,6 +53,7 @@ def create_app(config: dict | None = None) -> Flask:
         CANAL_ENLACE=os.environ.get("CANAL_ENLACE", ""),
         WHISPER_MODELO=os.environ.get("WHISPER_MODELO", "small"),
         APOYOS_POR_EVENTO=int(os.environ.get("APOYOS_POR_EVENTO", "1")),
+        META_SEGUIDORES=int(os.environ.get("META_SEGUIDORES", "1000")),
         GOOGLE_CALENDAR_ID=os.environ.get("GOOGLE_CALENDAR_ID", "primary"),
         META_AUTO=os.environ.get("META_AUTO", "0") == "1",
         META_PAGE_ID=os.environ.get("META_PAGE_ID", ""),
@@ -73,6 +74,8 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(bandeja.bp)
     app.register_blueprint(equipo.bp)
     app.register_blueprint(panel.bp)
+    app.register_blueprint(avance.bp)
+    app.register_blueprint(reportes.bp)
     errores.registrar(app)
     cli.registrar(app)
     _registrar_frontend(app)

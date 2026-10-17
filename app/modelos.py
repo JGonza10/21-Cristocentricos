@@ -234,3 +234,47 @@ class EstadoAgente(db.Model):
     def a_dict(self) -> dict:
         return {"nombre": self.nombre, "latido": _iso(self.latido), "ultimo_ok": _iso(self.ultimo_ok),
                 "mensaje": self.mensaje, "error": self.error}
+
+
+# --- Avance guiado por evento, reporte semanal y seguidores ------------------------
+
+PASOS_EVENTO = ("turnos", "prepara", "vivo", "grabacion", "reels", "carrusel",
+                "bandeja", "publicacion", "redes", "registro", "mides")
+
+
+class AvancePaso(db.Model):
+    """Lo que alguien marcó a mano en un paso del evento: hecho u omitido (no era necesario).
+
+    Los pasos que el sistema puede comprobar solo (turno asignado, grabación, reels…) no
+    necesitan fila: se calculan en app/avance.py. Una fila aquí siempre gana sobre lo automático.
+    """
+    __tablename__ = "avance_pasos"
+
+    fecha = db.Column(db.Date, primary_key=True)
+    paso = db.Column(db.String(20), primary_key=True)
+    estado = db.Column(db.String(10), nullable=False)    # hecho / omitido
+    nota = db.Column(db.String(200))
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+    usuario = db.relationship("Usuario")
+
+
+class Reporte(db.Model):
+    """Reporte semanal que arma solo el agente de reportes (lunes 8 am) con los datos del sistema."""
+    __tablename__ = "reportes"
+
+    semana = db.Column(db.Date, primary_key=True)       # lunes de la semana reportada
+    datos = db.Column(db.JSON, nullable=False)
+    creado = db.Column(db.DateTime, default=ahora, nullable=False)
+
+
+class Seguidores(db.Model):
+    """Seguidores por red capturados a mano (las redes no los dan sin cuentas conectadas)."""
+    __tablename__ = "seguidores"
+    __table_args__ = (db.UniqueConstraint("fecha", "red"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False, index=True)
+    red = db.Column(db.String(20), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)

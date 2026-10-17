@@ -9,6 +9,7 @@ Horarios (hora CDMX):
   - cada 30 segundos .... recortes de reels pedidos desde la bandeja
   - cada 3 minutos ...... publicar lo aprobado
   - domingo 6:00 pm ..... reparto de turnos de la semana
+  - lunes 8:00 am ....... reporte semanal de la semana anterior
 """
 import logging
 from datetime import datetime, timedelta
@@ -22,7 +23,7 @@ from watchdog.observers import Observer
 
 from app import create_app
 
-from . import carrusel, publicacion, reels, turnos
+from . import carrusel, publicacion, reels, reporte, turnos
 from .estado import latido
 from .fechas import CDMX
 
@@ -68,6 +69,8 @@ def crear_planificador(app) -> BlockingScheduler:
     sched.add_job(trabajo("invitaciones", turnos.sincronizar_invitaciones,
                           lambda n: f"{_plural(n, 'invitación actualizada', 'invitaciones actualizadas')}"),
                   "cron", minute=20, id="invitaciones", next_run_time=ahora + timedelta(seconds=20))
+    sched.add_job(trabajo("reporte", reporte.tarea_semanal, lambda s: f"Reporte de la semana del {s.day}/{s.month} listo"),
+                  "cron", day_of_week="mon", hour=8, minute=0, id="reporte")
     return sched
 
 
