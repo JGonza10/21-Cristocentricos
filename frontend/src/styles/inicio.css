@@ -44,16 +44,23 @@
 .paso-accion{padding-top:6px}
 @media (max-width:560px){.paso-cuerpo{padding-left:16px}}
 
+/* Modo ejemplo (solo la copia del puerto 5022) */
+.ejemplo-banda{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;
+  border-radius:var(--r-item);border:1.5px dashed var(--warn);background:var(--warn-soft)}
+.ejemplo-banda > div:first-child{flex:1 1 360px;min-width:0}
+.ejemplo-banda p{margin:6px 0 0;font-size:.9rem;color:var(--ink-2)}
+.ejemplo-banda .ejemplo-msg{font-weight:700;color:var(--ink)}
+
 /* Calendario y equipo (ventana) */
 .cal-ventana{display:grid;gap:18px}
-@media (min-width:900px){.cal-ventana{grid-template-columns:minmax(0,1fr) minmax(0,320px);align-items:start}}
+@media (min-width:900px){.cal-ventana{grid-template-columns:minmax(0,1fr) minmax(0,280px);align-items:start}}
 .cal-principal{min-width:0}
 .cal-cabeza{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-mes{min-width:9.5em;text-align:center}
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .cal-dia-nombre{font:700 .7rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:2px}
-.cal-celda{min-height:66px;padding:6px 7px;border-radius:10px;background:var(--surface-2);border:1px solid transparent;
+.cal-celda{min-height:52px;padding:5px 6px;border-radius:10px;background:var(--surface-2);border:1px solid transparent;
   display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:inherit;color:var(--muted-2);min-width:0}
 .cal-celda.fuera{opacity:.45}
 .cal-celda.hoy .cal-num{background:var(--accent);color:var(--on-accent);border-radius:99px;padding:0 6px}

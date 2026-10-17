@@ -45,6 +45,7 @@ export default function Inicio({ ir }) {
   const [aviso, setAviso] = useState('')
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [ejemploMsg, setEjemploMsg] = useState('')
   const previo = useRef(null)
 
   const cargarAvance = useCallback(() => {
@@ -90,6 +91,23 @@ export default function Inicio({ ir }) {
     try {
       const d = await api(`/api/avance/${avance.fecha}/${paso}`, { metodo: 'PUT', datos: { accion } })
       setAvance(d)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  // Solo en la copia de ejemplo (puerto 5022): simula lo que toca en el paso actual.
+  async function ejemplo(accion) {
+    setOcupado(true)
+    setError('')
+    try {
+      const d = await api(`/api/ejemplo/${accion}`, { metodo: 'POST', datos: accion === 'avanzar' ? { fecha: avance?.fecha } : {} })
+      setEjemploMsg(d.mensaje)
+      if (d.avance) { setFechaSel(d.avance.fecha); setAvance(d.avance) } // se queda en este evento aunque termine
+      else { setFechaSel(null); previo.current = null; setAbiertos(null) }
+      cargar()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -176,6 +194,21 @@ export default function Inicio({ ir }) {
         </section>
       )}
 
+      {estado?.ejemplo && (
+        <section className="ejemplo-banda" aria-label="Modo ejemplo">
+          <div>
+            <span className="pill ambar">Modo ejemplo</span>
+            <p>Datos inventados para revisar cómo funciona; tus datos reales no se tocan. «Avanzar el ejemplo» hace lo que
+              haría el sistema (o tú) en el paso actual. También puedes marcar pasos o aprobar en Contenido como en la app real.</p>
+            {ejemploMsg && <p className="ejemplo-msg" role="status">{ejemploMsg}</p>}
+          </div>
+          <div className="botones">
+            <button className="btn chico" disabled={ocupado || avance?.completo} onClick={() => ejemplo('avanzar')}>Avanzar el ejemplo</button>
+            <button className="btn suave chico" disabled={ocupado} onClick={() => ejemplo('reiniciar')}>Reiniciar ejemplo</button>
+          </div>
+        </section>
+      )}
+
       <section className="tarjeta proceso">
         <div className="proceso-cabeza">
           <div>
@@ -247,7 +280,7 @@ export default function Inicio({ ir }) {
         {guia}
       </Modal>
 
-      <Modal abierto={modal === 'calendario'} titulo="Calendario y equipo" ancho="grande" alCerrar={() => setModal(null)}>
+      <Modal abierto={modal === 'calendario'} titulo="Calendario y equipo" ancho="medio" alCerrar={() => setModal(null)}>
         <CalendarioEventos ir={ir} fechaInicial={calFecha} alCambiar={cargar} />
       </Modal>
 

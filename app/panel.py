@@ -64,4 +64,5 @@ def estado():
         google=google.configurado(),
         meta=meta.configurado(),
         canal=current_app.config["CANAL_NOMBRE"],
+        ejemplo=current_app.config["EJEMPLO"],
     )

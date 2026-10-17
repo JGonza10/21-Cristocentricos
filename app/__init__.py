@@ -61,6 +61,7 @@ def create_app(config: dict | None = None) -> Flask:
         META_TOKEN=os.environ.get("META_TOKEN", ""),
         META_GRAPH_VERSION=os.environ.get("META_GRAPH_VERSION", "v23.0"),
         LOG_DIR=RAIZ / "datos" / "logs",
+        EJEMPLO=os.environ.get("EJEMPLO", "0") == "1",  # solo la copia de ejemplo (ejemplo.py)
     )
     if config:
         app.config.update(config)
@@ -76,6 +77,9 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(panel.bp)
     app.register_blueprint(avance.bp)
     app.register_blueprint(reportes.bp)
+    if app.config["EJEMPLO"]:
+        from . import ejemplo
+        app.register_blueprint(ejemplo.bp)
     errores.registrar(app)
     cli.registrar(app)
     _registrar_frontend(app)
