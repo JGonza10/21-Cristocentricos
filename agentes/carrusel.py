@@ -313,8 +313,10 @@ def _reel_promocional(f: date, carpeta: Path) -> None:
 
 
 def _existentes(f: date, tipo: str, cual: str) -> list[Paquete]:
-    from app.avance import momento
-    return [p for p in Paquete.query.filter_by(tipo=tipo, fecha_evento=f).all() if momento(p) == cual]
+    """Piezas ya hechas por este agente. Las invitaciones viejas (sin «momento», con los misterios)
+    no cuentan: así, al ponerle tema al evento, sale la difusión nueva."""
+    return [p for p in Paquete.query.filter_by(tipo=tipo, fecha_evento=f).all()
+            if (p.datos or {}).get("momento") == cual]
 
 
 def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
