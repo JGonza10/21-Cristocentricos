@@ -178,6 +178,10 @@ Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
 
 Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos completos entregados.
 
+**Habilidades de la fase 5** (`.claude/skills/`): `fase5-publicacion` (plano del agente),
+`youtube-privado` (subida por API), `textos-por-red` (límites y hashtags) y
+`guardia-publicacion` (revisión final con `scripts/revisar_paquete.py`).
+
 ## 9. Decisiones tomadas
 | # | Tema | Decisión |
 |---|---|---|
