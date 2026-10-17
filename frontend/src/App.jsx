@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, olvidarCsrf } from './api.js'
 import { aplicarTema, temaActual } from './tema.js'
 import { Luna, Sol } from './iconos.jsx'
@@ -28,7 +28,7 @@ export default function App() {
   const [fechaEvento, setFechaEvento] = useState(null)
   const [tema, setTema] = useState(temaActual)
   const [ideas, setIdeas] = useState(false)
-  const [diagrama, setDiagrama] = useState(0)
+  const [diagrama, setDiagrama] = useState(false)
 
   useEffect(() => {
     api('/api/auth/yo').then((d) => setUsuario(d.usuario)).catch(() => setUsuario(null))
@@ -43,6 +43,8 @@ export default function App() {
     setPestana(id)
     window.scrollTo({ top: 0 })
   }
+
+  const cerrarAvisoDiagrama = useCallback(() => setDiagrama(false), [])
 
   function elegirTema(t) {
     aplicarTema(t)
@@ -69,7 +71,7 @@ export default function App() {
               <button aria-pressed={tema === 'light'} onClick={() => elegirTema('light')}><Sol /><span>Claro</span></button>
               <button aria-pressed={tema === 'dark'} onClick={() => elegirTema('dark')}><Luna /><span>Oscuro</span></button>
             </div>
-            <button className="btn suave chico" onClick={() => { ir('inicio'); setDiagrama((n) => n + 1) }}
+            <button className="btn suave chico" onClick={() => { ir('inicio'); setDiagrama(true) }}
               title="Muestra en grande cómo funciona el proceso del evento">Diagrama</button>
             <button className="btn suave chico" onClick={() => setIdeas(true)} title="Guarda una idea escrita o por voz">Ideas</button>
             <button className="btn suave chico" onClick={salir}>Salir</button>
@@ -85,7 +87,7 @@ export default function App() {
       </header>
 
       <main className="envoltura" role="tabpanel">
-        {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} />}
+        {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} alVerDiagrama={cerrarAvisoDiagrama} />}
         {pestana === 'contenido' && <Contenido />}
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}

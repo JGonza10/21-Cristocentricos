@@ -38,7 +38,7 @@ function abrirReloj() {
   window.open('/reloj', 'reloj', 'popup,width=1280,height=720')
 }
 
-export default function Inicio({ ir, verDiagrama = 0 }) {
+export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
   const [ahora, setAhora] = useState(() => new Date())
   const [estado, setEstado] = useState(null)
   const [turnos, setTurnos] = useState({})
@@ -54,7 +54,9 @@ export default function Inicio({ ir, verDiagrama = 0 }) {
   const [ejemploMsg, setEjemploMsg] = useState('')
   const previo = useRef(null)
 
-  useEffect(() => { if (verDiagrama) setModal('diagrama') }, [verDiagrama])
+  useEffect(() => {          // el botón del menú lo pide una sola vez; al volver a Inicio no se reabre
+    if (verDiagrama) { setModal('diagrama'); alVerDiagrama?.() }
+  }, [verDiagrama, alVerDiagrama])
 
   const cargarAvance = useCallback(() => {
     api(fechaSel ? `/api/avance/${fechaSel}` : '/api/avance/activo').then(setAvance).catch((e) => setError(e.message))
