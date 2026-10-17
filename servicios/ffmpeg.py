@@ -31,6 +31,18 @@ def duracion(ruta: str) -> float:
     return float(json.loads(r.stdout)["format"]["duration"])
 
 
+def audio_16k(ruta: str):
+    """Audio mono a 16 kHz como arreglo float32 (lo que espera Whisper), decodificado con ffmpeg."""
+    import numpy as np
+    if shutil.which("ffmpeg") is None:
+        raise ErrorFfmpeg("No se encontró ffmpeg. Instálalo con: winget install Gyan.FFmpeg")
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-i", ruta, "-vn",
+                        "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True, timeout=1800)
+    if r.returncode != 0:
+        raise ErrorFfmpeg(r.stderr.decode("utf-8", "replace")[-1500:])
+    return np.frombuffer(r.stdout, np.int16).astype(np.float32) / 32768.0
+
+
 def silencios(ruta: str, ruido_db: int = -35, minimo_s: float = 1.5) -> list[tuple[float, float]]:
     """Tramos de silencio [(inicio, fin), ...] según el filtro silencedetect."""
     r = _ejecutar(["ffmpeg", "-hide_banner", "-nostats", "-i", ruta, "-vn",

@@ -22,6 +22,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from app import create_app
+from app.extensiones import db
 
 from . import carrusel, publicacion, reels, reporte, turnos
 from .estado import latido
@@ -44,6 +45,7 @@ def crear_planificador(app) -> BlockingScheduler:
                     latido(nombre, describir(resultado), ok=True)
                 except Exception:  # noqa: BLE001 — un agente que falla no tumba a los demás
                     app.logger.exception("Falló el agente %s", nombre)
+                    db.session.rollback()   # si no, el latido de abajo también falla
                     latido(nombre, "Falló la última vez. Revisa datos/logs/app.log.", error=True)
         return correr
 

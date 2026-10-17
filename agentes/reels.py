@@ -185,6 +185,7 @@ def procesar(grab: Grabacion) -> list[Paquete]:
     db.session.commit()
     try:
         grab.duracion = ffmpeg.duracion(str(ruta))
+        db.session.commit()   # sin escritura abierta durante la transcripción: bloquearía a los demás agentes
         if grab.segmentos is None:
             current_app.logger.info("Transcribiendo %s (puede tardar varios minutos)", grab.nombre)
             grab.segmentos = whisper.transcribir(str(ruta), current_app.config["WHISPER_MODELO"])

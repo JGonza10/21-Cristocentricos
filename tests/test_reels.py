@@ -186,6 +186,17 @@ def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
         assert Grabacion.query.first().estado == "lista"
 
 
+@hay_ffmpeg
+def test_audio_para_whisper_sale_de_ffmpeg(tmp_path):
+    """Whisper recibe el audio ya decodificado (mono, 16 kHz); no depende de PyAV."""
+    video = tmp_path / "corto.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440", "-t", "2",
+                    "-c:a", "aac", str(video)], check=True)
+    audio = ffmpeg.audio_16k(str(video))
+    assert audio.dtype.name == "float32" and 31000 <= audio.shape[0] <= 33000
+    assert 0 < abs(audio).max() <= 1
+
+
 # --- Recorte manual desde la bandeja (§2.1.7) ---------------------------------------
 
 @pytest.fixture

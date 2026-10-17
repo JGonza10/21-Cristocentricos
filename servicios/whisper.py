@@ -12,8 +12,10 @@ def _modelo(nombre: str):
 
 def transcribir(ruta: str, modelo: str = "small") -> list[list]:
     """Devuelve [[inicio, fin, texto], ...] en segundos. La primera vez descarga el modelo (~500 MB)."""
+    from .ffmpeg import audio_16k
+    # El audio lo saca ffmpeg (no PyAV): PyAV 19 rompió la lectura interna de faster-whisper.
     segmentos, _info = _modelo(modelo).transcribe(
-        ruta, language="es", vad_filter=True, beam_size=5,
+        audio_16k(ruta), language="es", vad_filter=True, beam_size=5,
         initial_prompt="Santo Rosario. Dios te salve, María. Padre nuestro. Gloria al Padre. Misterio.",
     )
     return [[round(s.start, 2), round(s.end, 2), s.text.strip()] for s in segmentos if s.text.strip()]
