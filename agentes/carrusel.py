@@ -387,7 +387,8 @@ def frase_de(segmentos: list, inicio: float, fin: float, maximo: int = 150) -> s
         return ""
     candidatas = [t for t in textos if 40 <= len(t) <= maximo] or textos
     mejor = max(candidatas, key=lambda t: (t[-1:] in ".?!", min(len(t), maximo)))
-    return textwrap.shorten(mejor, maximo, placeholder="…")
+    mejor = textwrap.shorten(mejor, maximo, placeholder="…")
+    return mejor[:1].upper() + mejor[1:]       # la transcripción a veces empieza a media frase
 
 
 def _portada(escena: Image.Image, f: date) -> Image.Image:

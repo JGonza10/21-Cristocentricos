@@ -137,3 +137,8 @@ def test_fechas_en_espanol():
     assert fechas.nombre_fecha(date(2026, 9, 16)) == "Miércoles 16 de septiembre"
     assert fechas.inicio(LUNES).utcoffset().total_seconds() == -6 * 3600   # CDMX sin horario de verano
     assert fechas.proximos_eventos(date(2026, 10, 17), 7) == [LUNES, VIERNES]
+
+
+def test_frase_empieza_con_mayuscula():
+    segs = [[0, 6, "mandará a sus ángeles que te cuiden en todos tus caminos"]]
+    assert carrusel.frase_de(segs, 0, 6).startswith("Mandará a sus ángeles")

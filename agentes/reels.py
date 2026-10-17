@@ -198,6 +198,10 @@ def procesar(grab: Grabacion) -> list[Paquete]:
         tema = titulo_de(grab.fecha_evento)
         for k, m in enumerate(momentos, start=1):
             carpeta_rel = f"{grab.fecha_evento.isoformat()}/reel-{grab.id}-{k}"
+            n = 2
+            while (Path(current_app.config["PAQUETES_DIR"]) / carpeta_rel).exists():   # reprocesada: no pisar
+                carpeta_rel = f"{grab.fecha_evento.isoformat()}/reel-{grab.id}-{k}-v{n}"
+                n += 1
             _render(grab, m["inicio"], m["fin"], carpeta_rel)
             nuevos.append(crear_paquete(
                 "reel", grab.fecha_evento, f"Reel {k} · {tema or etiqueta(m)}"[:120],
