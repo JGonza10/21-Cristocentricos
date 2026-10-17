@@ -206,9 +206,7 @@ Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js
 - **Reporte semanal automático** (`agentes/reporte.py`, tabla `reportes`, `app/reportes.py`): el worker lo arma **sin IA** los lunes 8 am (semana anterior); también se genera a mano. Trae resumen por evento («resumen del vivo»), equipo, bandeja, redes, seguidores contra `META_SEGUIDORES` (captura manual en la tabla `seguidores`, `PUT /api/seguidores`) y «qué mejorar» con reglas.
 - Estado en vivo en `frontend/src/pasos.js` (`calcularVivo`) desde `/api/estado` (incluye `publicaciones_por_red` y `ultimo_reporte`).
 
-## Modo ejemplo (Gonza, 2026-10-16)
-- `ejemplo.bat` / `python ejemplo.py [--reiniciar]`: copia aparte en **http://localhost:5022** con base `datos/ejemplo.db`, cookie `cristo_ejemplo` y sin worker; copia las cuentas (solo usuario/nombre/hash) de la base real para entrar con la misma contraseña. Nunca toca `cristocentricos.db`.
-- `app/ejemplo.py` (blueprint solo con `EJEMPLO=1`): siembra 5 integrantes inventados, los eventos de las 3 semanas anteriores completos (grabación, reels, carrusel, bandeja, publicaciones, reportes), turnos futuros con huecos y seguidores. El evento más reciente ya terminado queda en el paso 1; la franja «Modo ejemplo» de Inicio tiene «Avanzar el ejemplo» (simula el paso actual) y «Reiniciar ejemplo».
+## Ventana del calendario (Gonza, 2026-10-16)
 - Ventana del calendario: variante `ancho="medio"` de `Modal` (80 % de la pantalla).
 
 ## Fuera de alcance por ahora (Gonza, 2026-10-16)
