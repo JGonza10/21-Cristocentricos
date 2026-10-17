@@ -68,15 +68,15 @@ export function semanaYSiguiente(ahora = new Date()) {
   return [0, 4, 7, 11].map((n) => infoEvento(new Date(lunes.getTime() + n * DIA_MS), ahora))
 }
 
-/** Qué contenido toca preparar: carrusel 2 días antes y reels el mismo día del evento. */
+/** Qué contenido toca preparar: difusión antes del evento y reels el mismo día. */
 export function agendaEditorial(ahora = new Date()) {
   const hoy = medianoche(ahoraCDMX(ahora))
   const items = []
   for (const r of semanaYSiguiente(ahora)) {
     const carrusel = new Date(r.fecha.getTime() - 2 * DIA_MS)
-    if (carrusel >= hoy) items.push({ fecha: carrusel, tipo: 'Carrusel', texto: `Invitación del ${r.nombre.toLowerCase()} · ${r.misterios.toLowerCase()}` })
+    if (carrusel >= hoy) items.push({ fecha: carrusel, tipo: 'Carrusel', texto: `Difusión del ${r.nombre.toLowerCase()}` })
     if (r.estado === 'futuro' || r.estado === 'hoy' || r.estado === 'en-vivo')
-      items.push({ fecha: r.fecha, tipo: 'Reels', texto: `3 reels del evento, después de las 11 am` })
+      items.push({ fecha: r.fecha, tipo: 'Reels', texto: `5 reels y carrusel del evento, después de las 11 am` })
   }
   return items.sort((a, b) => a.fecha - b.fecha).slice(0, 5)
 }

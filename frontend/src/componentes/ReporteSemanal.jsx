@@ -58,6 +58,7 @@ export default function ReporteSemanal({ alCambiar }) {
         <div className="botones-fila">
           {datos && <button className="btn suave chico" onClick={() => generar(datos.semana)} disabled={ocupado}>Actualizar esta semana</button>}
           <button className="btn chico" onClick={() => generar()} disabled={ocupado}>Generar la semana actual</button>
+          <a className="btn suave chico" href="/api/registro.csv" download>Descargar registro (Excel)</a>
         </div>
       </div>
       <p className="chico-texto">Se arma solo cada lunes a las 8 am con lo que registró el sistema; no hace falta pedírselo a nadie.
@@ -90,7 +91,7 @@ export default function ReporteSemanal({ alCambiar }) {
             <div className="reporte-eventos">
               {datos.eventos.map((e) => (
                 <article key={e.fecha} className="reporte-evento">
-                  <b>{e.nombre}</b> <span className="muted">· {e.misterios}</span>
+                  <b>{e.nombre}</b> <span className="muted">· {e.tema ?? e.misterios}</span>
                   <p>Dirigió: <b>{e.dirige ?? 'nadie asignado'}</b>{e.apoyan.length > 0 && <> · Apoyó: {e.apoyan.join(', ')}</>}</p>
                   <p>Grabación: {e.grabacion ? `${e.grabacion.nombre}${e.grabacion.minutos ? ` (${e.grabacion.minutos} min)` : ''}` : e.ya_paso ? 'no llegó' : 'aún no es el evento'}</p>
                   <p>{e.reels} reels · carrusel {e.carrusel ? 'sí' : 'no'} · {e.bandeja.aprobado} aprobados, {e.bandeja.rechazado} rechazados{e.bandeja.pendiente ? `, ${e.bandeja.pendiente} por revisar` : ''}</p>

@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from .bandeja import conteos
 from .extensiones import db
-from .modelos import EstadoAgente, Grabacion, Paquete, Publicacion, Reporte, ahora
+from .modelos import EstadoAgente, Grabacion, Idea, Paquete, Publicacion, Reporte, Tema, ahora
 from .seguridad import login_requerido
 
 bp = Blueprint("panel", __name__, url_prefix="/api")
@@ -45,10 +45,20 @@ def _ultimo_reporte() -> dict | None:
             "mejorar": len(r.datos.get("mejorar", []))} if r else None
 
 
+def _temas_proximos(dias: int = 14) -> list[dict]:
+    """Los eventos de las próximas 2 semanas con su tema (o sin él), para el aviso de Inicio."""
+    from agentes import fechas
+    hoy = fechas.hoy_cdmx()
+    lista = fechas.proximos_eventos(hoy, dias)
+    temas = {t.fecha: t for t in Tema.query.filter(Tema.fecha.in_(lista)).all()}
+    return [{"fecha": f.isoformat(), "tema": temas[f].titulo if f in temas else None,
+             "guion": bool(temas[f].guion.strip()) if f in temas else False} for f in lista]
+
+
 @bp.get("/estado")
 @login_requerido
 def estado():
-    from servicios import google, meta
+    from servicios import google, meta, obs
     registros = {e.nombre: e for e in EstadoAgente.query.all()}
     worker = registros.get("worker")
     activo = bool(worker and worker.latido and ahora() - worker.latido < LATIDO_MAX)
@@ -67,5 +77,7 @@ def estado():
         google=google.configurado(),
         meta=meta.configurado(),
         canal=current_app.config["CANAL_NOMBRE"],
-        ejemplo=current_app.config["EJEMPLO"],
+        temas=_temas_proximos(),
+        obs=obs.estado(),
+        ideas_nuevas=Idea.query.filter(Idea.estado.in_(("lista", "transcribiendo"))).count(),
     )

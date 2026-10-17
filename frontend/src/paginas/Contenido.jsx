@@ -145,6 +145,8 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
     <article className="tarjeta paquete" aria-labelledby={`paq-${p.id}`}>
       <div className="paq-cabeza">
         <span className="pill">{p.tipo}</span>
+        {p.datos.momento === 'antes' && <span className="pill ambar">Difusión</span>}
+        {p.datos.momento === 'despues' && <span className="pill verde">Del video</span>}
         <span className="muted chico-texto">Evento del {nombreFecha(fechaDeClave(p.fecha_evento)).toLowerCase()}</span>
       </div>
       <h3 id={`paq-${p.id}`}>{p.titulo}</h3>

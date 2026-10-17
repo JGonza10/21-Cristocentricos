@@ -33,3 +33,17 @@ export async function api(ruta, { metodo = 'GET', datos } = {}) {
   }
   return cuerpo
 }
+
+/** POST con un cuerpo binario (video o audio) y cabeceras propias. Devuelve { ok, status, cuerpo }. */
+export async function enviarCrudo(ruta, cuerpo, cabeceras = {}) {
+  const headers = { ...cabeceras, 'X-CSRFToken': csrf || (await obtenerCsrf()) }
+  let r
+  try {
+    r = await fetch(ruta, { method: 'POST', credentials: 'same-origin', headers, body: cuerpo })
+  } catch {
+    throw Object.assign(new Error('Se perdió la conexión con el servidor.'), { status: 0 })
+  }
+  let datos = {}
+  try { datos = await r.json() } catch { /* sin JSON */ }
+  return { ok: r.ok, status: r.status, cuerpo: datos }
+}

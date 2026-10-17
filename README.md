@@ -61,15 +61,40 @@ Doble clic en `iniciar.bat`. Se abren **dos ventanas que no debes cerrar**:
 
 Si la ventana de agentes está cerrada, Inicio muestra «Agentes: Apagados».
 
-### Flujo de cada semana
-1. **Sábado y miércoles**: aparece el carrusel en la bandeja (pestaña Contenido). Revísalo y apruébalo.
-2. **Lunes y viernes, 10 am**: transmiten. Configura OBS/StreamYard para que la grabación se guarde
-   (o la copies) en la carpeta `grabaciones/` del proyecto.
-3. **Unos minutos después**: llegan 3 reels a la bandeja. Si un recorte no quedó bien, usa
-   «Ajustar recorte» y escribe el segundo de inicio y de fin.
-4. **Al aprobar**: en `paquetes/<fecha>/subir_manual/<red>/` queda cada pieza con su `texto.txt`.
-   Súbela y presiona «Ya lo subí». YouTube se sube solo (en privado) si Google está autorizado.
-5. **Domingo 6 pm**: se reparten los turnos de la semana y se mandan las invitaciones.
+### Flujo de cada evento (desde el 2026-10-17)
+Cada evento (lunes y viernes, 10 a 11 am) tiene un **tema**. Inicio guía los 13 pasos en orden:
+1. **Tema y guion**: en el calendario (o en la pestaña Evento) pones el tema con anticipación; lo
+   ideal es tener siempre los próximos 2 eventos con tema. Al guardarlo, al equipo le llega un correo
+   y se actualiza su invitación de Google Calendar. «Preparar guion con Claude» copia las
+   instrucciones y abre Claude: pégalas, y el guion que te dé pégalo de vuelta y guarda.
+2. **Turnos**: quién dirige y quién apoya.
+3. **Difusión**: en cuanto hay tema (hasta 2 semanas antes) llegan a la bandeja un carrusel de 5
+   imágenes y un reel promocional de 15 s (súbelo con un audio de moda en cada red).
+4. **Revisión técnica**: la lista de audio, cámara, internet, StreamYard, OBS, guion y reloj.
+5. **Transmisión** por StreamYard, como siempre. **OBS graba solo** de 9:55 a 11:05 (o con el botón
+   «Empezar a grabar») y deja el video en `grabaciones/`.
+6. Si se grabó en otra computadora: **«Subir grabación»** (por partes; se reanuda si se corta).
+7. **5 reels** con mejora automática de luz, color y volumen, y un **carrusel con escenas** del video.
+8. **Bandeja**: apruebas o rechazas. Lo aprobado se publica o queda en `subir_manual/<red>/`.
+9. **Registro** automático (descárgalo para Excel desde el reporte) y **reporte semanal** los lunes.
+
+**Ideas**: botón «Ideas» arriba a la derecha; se escriben o se graban por voz (Whisper las pasa a
+texto en esta PC) y cualquiera se puede volver el tema de un evento.
+
+## OBS (grabación automática)
+Una sola vez en la PC donde corre la app (OBS ya instalado con `winget install OBSProject.OBSStudio`):
+```powershell
+.venv\Scripts\flask --app app obs-configurar
+```
+Activa el control de OBS con una contraseña nueva (queda en `.env` como `OBS_PASSWORD`). La app crea
+la escena «Cristocéntricos» con la pantalla principal; el audio del escritorio y el micrófono son el
+audio global de OBS. Con `OBS_AUTO=1` los días de evento abre OBS y graba solo. Transmite desde esa
+misma PC para que la grabación caiga directo en `grabaciones/`.
+
+## Dos computadoras
+La app, los agentes, la base de datos y **todos los videos** viven en una sola PC (la "servidora").
+La otra entra por Tailscale (sección siguiente): ve y aprueba todo, sube grabaciones y captura ideas;
+los videos nunca suben a la nube.
 
 ## Acceso del aprobador desde otra computadora (Tailscale)
 Tailscale crea una red privada y cifrada entre tu PC y la del aprobador. La app **no** queda en
@@ -145,9 +170,9 @@ grande en otra ventana: hora de la CDMX y cuenta regresiva, en tema perla. La di
 
 El overlay no pide contraseña porque no muestra ningún dato privado, solo la hora.
 
-## Conectar Google (YouTube y Calendar), una sola vez
-1. Entra a https://console.cloud.google.com, crea un proyecto y activa **YouTube Data API v3** y
-   **Google Calendar API**.
+## Conectar Google (YouTube, Calendar y Gmail), una sola vez
+1. Entra a https://console.cloud.google.com, crea un proyecto y activa **YouTube Data API v3**,
+   **Google Calendar API** y **Gmail API** (Gmail manda el aviso del tema al equipo).
 2. En «Pantalla de consentimiento de OAuth» elige *Externo* y agrega tu correo como usuario de prueba.
 3. En «Credenciales» → *Crear credenciales* → *ID de cliente de OAuth* → **App de escritorio**.
    Descarga el JSON y guárdalo como `secretos/client_secret.json`.

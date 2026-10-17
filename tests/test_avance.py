@@ -98,10 +98,15 @@ def test_datos_no_validos(cliente):
     assert enviar(cliente, f"/api/avance/{VIERNES}/turnos", {"accion": "hecho", "nota": "x" * 201}, metodo="put").status_code == 400
 
 
-def test_evento_activo_es_el_mas_antiguo_sin_terminar(cliente):
+def test_evento_activo_es_el_mas_antiguo_sin_terminar(app, cliente):
     login(cliente)
     d = cliente.get("/api/avance/activo").get_json()
-    assert d["fecha"] == "2026-10-09"           # el viernes de hace 8 días sigue sin terminar
+    assert d["fecha"] == "2026-10-19"           # los pasados sin ninguna actividad no cuentan: va el próximo
+    with app.app_context():
+        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=date(2026, 10, 9), estado="lista"))
+        db.session.commit()
+    d = cliente.get("/api/avance/activo").get_json()
+    assert d["fecha"] == "2026-10-09"           # el viernes de hace 8 días se trabajó y sigue sin terminar
 
 
 def test_sin_sesion(cliente):

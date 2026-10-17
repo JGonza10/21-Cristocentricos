@@ -209,5 +209,18 @@ Todo lo visible y los nombres internos dicen **evento** (`frontend/src/evento.js
 ## Ventana del calendario (Gonza, 2026-10-16)
 - Ventana del calendario: variante `ancho="medio"` de `Modal` (80 % de la pantalla).
 
+## Proceso por tema (documento «Lo que necesito», Gonza 2026-10-17)
+- **Cada evento tiene un tema** (tabla `temas`, `app/temas.py`): título, descripción, cita, guion, intenciones, notas y la revisión técnica (`checklist`). Ya no se usan los misterios en lo visible (`fechas.misterios` queda solo por compatibilidad).
+- **13 pasos** (`PASOS_EVENTO`): tema, turnos, difusion, revision, vivo, grabacion, reels, carrusel, bandeja, publicacion, redes, registro, mides. `avance.momento(p)`: `antes` = difusión, `despues` = sale del video (reels y carrusel de escenas); carruseles viejos sin `momento` cuentan como `antes`. El evento activo ignora eventos pasados sin ninguna actividad.
+- **Agente de imágenes** (`agentes/carrusel.py`): difusión (carrusel 5 láminas con el tema + reel promo 15 s con `ffmpeg.video_de_imagenes`) en cuanto hay tema, hasta 14 días antes, cada 15 min; botón `POST /api/temas/<f>/difusion`. **Carrusel de escenas** lo llama `reels.procesar` con los 5 momentos (fotos con `ffmpeg.cuadro`, frases de la transcripción).
+- **Reels**: `CUANTOS = 5`; `MEJORAR_VIDEO=1` aplica `eq` según el brillo del tramo y `loudnorm`.
+- **OBS** (`servicios/obs.py`, `agentes/grabacion.py`, `/api/obs*`): websocket v5 (`obsws-python`), `flask obs-configurar` escribe la contraseña y marca `FirstRun` (si no, el asistente bloquea). Antes de abrir OBS se borran las marcas `.sentinel/run_*` (si no, pregunta por el modo seguro). La captura usa WGC (`method: 2`) y el `monitor_id` del monitor principal: sin él graba negro. `OBS_AUTO=1` graba de 9:55 a 11:05 los días de evento. Probado de verdad el 2026-10-17.
+- **Subir grabación** por partes (`POST /api/grabaciones/subir`, 8 MB por parte, reanuda con 409) y ajusta la fecha del archivo a la del evento elegido.
+- **Ideas** (`app/ideas.py`, `agentes/ideas.py`): escritas o audio del navegador (`MediaRecorder`; `Permissions-Policy microphone=(self)`, CSP `media-src 'self' blob:`), Whisper local las transcribe; «Usar como tema».
+- **Avisos del tema** por correo con Gmail API (`servicios/correo.py`, alcance `gmail.send` agregado a Google: hay que volver a correr `google-autorizar`) y título/descripción del evento en Calendar con el tema.
+- **Registro** (`GET /api/registro`, `/api/registro.csv` con BOM y protección contra fórmulas) sustituye a la hoja de Google Sheets.
+- Guion con Claude: botón que copia instrucciones (`GET /api/temas/<f>/instrucciones`) y abre claude.ai; **sin API de pago**. Videos con IA usando la imagen de Esbeidy: **pendiente** (Gonza).
+- Arquitectura de dos PCs: la app y los videos en una sola PC (la de Esbeidy o la de Juan) y la otra entra por Tailscale.
+
 ## Fuera de alcance por ahora (Gonza, 2026-10-16)
 Del diagrama de la guía (artifact "Cristocéntricos Automático") **no se usan** el recuadro **Comunidad** (seguidores y comentarios) ni las tres habilidades que salen de él: **Parroquias** (mensajes de difusión), **Bienvenida** (seguidores nuevos) y **Respuestas** (comentarios y mensajes), ni sus apartados. Gonza las propuso antes de hablar con el cliente. No construirlas ni mostrarlas hasta que él lo pida.

@@ -7,6 +7,8 @@ import Inicio from './paginas/Inicio.jsx'
 import Contenido from './paginas/Contenido.jsx'
 import Evento from './paginas/Evento.jsx'
 import Configuracion from './paginas/Configuracion.jsx'
+import Modal from './componentes/Modal.jsx'
+import Ideas from './componentes/Ideas.jsx'
 
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
@@ -25,6 +27,7 @@ export default function App() {
   const [pestana, setPestana] = useState(pestanaDeUrl)
   const [fechaEvento, setFechaEvento] = useState(null)
   const [tema, setTema] = useState(temaActual)
+  const [ideas, setIdeas] = useState(false)
 
   useEffect(() => {
     api('/api/auth/yo').then((d) => setUsuario(d.usuario)).catch(() => setUsuario(null))
@@ -65,6 +68,7 @@ export default function App() {
               <button aria-pressed={tema === 'light'} onClick={() => elegirTema('light')}><Sol /><span>Claro</span></button>
               <button aria-pressed={tema === 'dark'} onClick={() => elegirTema('dark')}><Luna /><span>Oscuro</span></button>
             </div>
+            <button className="btn suave chico" onClick={() => setIdeas(true)} title="Guarda una idea escrita o por voz">Ideas</button>
             <button className="btn suave chico" onClick={salir}>Salir</button>
           </div>
         </div>
@@ -83,6 +87,14 @@ export default function App() {
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}
       </main>
+
+      <footer className="pie">
+        © <a className="kestrel-link" href="https://kestrel-ia.up.railway.app/" target="_blank" rel="noopener noreferrer">Kestrel</a> {new Date().getFullYear()}
+      </footer>
+
+      <Modal abierto={ideas} titulo="Ideas del equipo" alCerrar={() => setIdeas(false)}>
+        <Ideas />
+      </Modal>
     </>
   )
 }

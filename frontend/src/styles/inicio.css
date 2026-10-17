@@ -131,6 +131,32 @@
 .seg-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
 .seg-form .campo{display:grid;gap:4px;font-size:.85rem;font-weight:700}
 
+/* Tema por evento, revisión técnica, OBS e ideas */
+.evento-tema{font-weight:600;color:var(--accent-strong)}
+.aviso-tema{margin:0;padding:12px 16px;border-radius:var(--r-item);background:var(--warn-soft);color:var(--ink);border:1px solid var(--warn)}
+.tema-aviso{margin:0;padding:10px 14px;border-radius:var(--r-item);background:var(--ok-soft);color:var(--ok);font-weight:700}
+.tema-evento textarea{resize:vertical}
+.paso-extra{padding:10px 0}
+.revision{border:1px solid var(--line);border-radius:var(--r-item);padding:8px 14px 10px;margin:0;background:var(--surface)}
+.revision legend{font-weight:700;padding:0 6px}
+.obs{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 0}
+.obs .chico-texto{flex-basis:100%}
+.cal-tema{font-size:.72rem;font-weight:700;color:var(--accent-strong);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-tema.falta{color:var(--warn)}
+.cal-leyenda i.sin-tema{background:var(--warn);height:4px;width:14px}
+.cal-sub{margin:18px 0 8px;font-size:1rem}
+.ideas{display:grid;gap:16px}
+.ideas-lista{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.idea{border:1px solid var(--line);border-radius:var(--r-item);padding:10px 14px;background:var(--surface);display:grid;gap:6px}
+.idea.e-usada{opacity:.75}
+.idea-cabeza{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.idea-texto{margin:0;white-space:pre-wrap}
+.idea audio{width:100%;max-width:420px}
+.idea select{min-height:38px}
+.btn.grabando{background:var(--err);color:var(--on-accent)}
+.subir input[type=file]{min-height:44px}
+@media (max-width:560px){.cal-tema{display:none}}
+
 @media (prefers-reduced-motion:reduce){
   .estado.activo::before,.avance-pista span{animation:none;transition:none}
 }

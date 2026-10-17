@@ -172,11 +172,18 @@ def avance(f: date) -> dict:
             "pasos": pasos, "actual": actual, "hechos": hechos, "total": len(pasos), "completo": actual is None}
 
 
+def _tuvo_actividad(f: date) -> bool:
+    return any(m.query.filter_by(**{campo: f}).first() is not None for m, campo in (
+        (Tema, "fecha"), (Grabacion, "fecha_evento"), (Paquete, "fecha_evento"), (AvancePaso, "fecha"), (Turno, "fecha")))
+
+
 def evento_activo() -> date:
     """El evento más antiguo de los últimos días que no ha terminado su proceso; si no hay, el próximo."""
     from agentes import fechas
     hoy = fechas.hoy_cdmx()
     for f in fechas.proximos_eventos(hoy - timedelta(DIAS_ATRAS), DIAS_ATRAS):
+        if f < hoy and not _tuvo_actividad(f):
+            continue                      # un evento pasado que nunca se trabajó no estorba
         if not avance(f)["completo"]:
             return f
     return fechas.proximos_eventos(hoy + timedelta(1), 7)[0]

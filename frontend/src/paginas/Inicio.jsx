@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { claveFecha, esDiaDeEvento, proximoEvento } from '../evento.js'
+import { claveFecha, esDiaDeEvento, nombreFecha, proximoEvento } from '../evento.js'
 import { fechaDeClave, fechaHora, nombres } from '../util.js'
 import { AVANCE, calcularVivo, ESTADOS, QUIEN } from '../pasos.js'
 import Flujo from '../componentes/Flujo.jsx'
 import Modal from '../componentes/Modal.jsx'
 import CalendarioEventos from '../componentes/CalendarioEventos.jsx'
 import ReporteSemanal from '../componentes/ReporteSemanal.jsx'
+import TemaEvento from '../componentes/TemaEvento.jsx'
+import Revision from '../componentes/Revision.jsx'
+import { ControlObs, SubirGrabacion } from '../componentes/Grabacion.jsx'
 import '../styles/inicio.css'
 
 const REFRESCO_MS = 20_000
@@ -29,6 +32,8 @@ function eventoVecino(clave, direccion) {
   return claveFecha(d)
 }
 
+const nombreFechaCorto = (clave) => nombreFecha(fechaDeClave(clave))
+
 function abrirReloj() {
   window.open('/reloj', 'reloj', 'popup,width=1280,height=720')
 }
@@ -39,8 +44,9 @@ export default function Inicio({ ir }) {
   const [turnos, setTurnos] = useState({})
   const [avance, setAvance] = useState(null)
   const [fechaSel, setFechaSel] = useState(null) // null = el evento que toca atender
-  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'reporte'
+  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'reporte' | 'tema' | 'subir'
   const [calFecha, setCalFecha] = useState(null)
+  const [temaFecha, setTemaFecha] = useState(null)
   const [abiertos, setAbiertos] = useState(null) // null = automático (se abre el paso actual)
   const [aviso, setAviso] = useState('')
   const [error, setError] = useState('')
@@ -120,16 +126,32 @@ export default function Inicio({ ir }) {
     setModal('calendario')
   }
 
+  function abrirTema(fecha) {
+    setTemaFecha(fecha)
+    setModal('tema')
+  }
+
   // Acción propia de cada paso (además de marcar u omitir).
   function accionDe(id) {
     switch (id) {
+      case 'tema': return { texto: 'Tema y guion', hacer: () => abrirTema(avance?.fecha) }
       case 'turnos': return { texto: 'Abrir calendario', hacer: () => abrirCalendario(avance?.fecha) }
       case 'vivo': return { texto: 'Abrir reloj', hacer: abrirReloj }
-      case 'reels': case 'carrusel': case 'bandeja': return { texto: 'Ir a la bandeja', hacer: () => ir('contenido') }
+      case 'grabacion': return { texto: 'Subir grabación', hacer: () => setModal('subir') }
+      case 'difusion': case 'reels': case 'carrusel': case 'bandeja': return { texto: 'Ir a la bandeja', hacer: () => ir('contenido') }
       case 'publicacion': case 'redes': return { texto: 'Ver publicaciones', hacer: () => ir('contenido') }
+      case 'registro': return { texto: 'Descargar registro (Excel)', hacer: () => { window.location.href = '/api/registro.csv' } }
       case 'mides': return { texto: 'Ver reporte', hacer: () => setModal('reporte') }
       default: return null
     }
+  }
+
+  // Lo que se hace ahí mismo en ciertos pasos (sin abrir otra pantalla).
+  function extraDe(id) {
+    if (!avance) return null
+    if (id === 'revision') return <Revision key={avance.fecha} fecha={avance.fecha} alCambiar={cargarAvance} />
+    if (id === 'vivo' || id === 'grabacion') return <ControlObs alCambiar={cargar} />
+    return null
   }
 
   const autoAbiertos = new Set(avance?.actual ? [avance.actual] : [])
@@ -154,6 +176,9 @@ export default function Inicio({ ir }) {
 
   const proximo = proximoEvento(ahora)
   const tProximo = proximo && turnos[proximo.clave]
+  const temas = estado?.temas ?? []
+  const temaProximo = proximo && temas.find((t) => t.fecha === proximo.clave)
+  const faltanTema = temas.slice(0, 2).filter((t) => !t.tema)
   const actual = avance?.actual ? pasos.find((p) => p.id === avance.actual) : null
   const barra = avance && (
     <div className="avance-barra" role="progressbar" aria-valuemin={0} aria-valuemax={avance.total} aria-valuenow={avance.hechos}
@@ -164,7 +189,7 @@ export default function Inicio({ ir }) {
   )
   const guia = avance && (
     <Guia avance={avance} actual={actual} item={actual && porId[actual.id]} accion={actual && accionDe(actual.id)}
-      ocupado={ocupado} alMarcar={marcar} />
+      extra={actual && extraDe(actual.id)} ocupado={ocupado} alMarcar={marcar} />
   )
   const mensajes = (
     <>
@@ -179,7 +204,12 @@ export default function Inicio({ ir }) {
         <section className="hero">
           <div className="etiqueta">{proximo.estado === 'en-vivo' ? 'En vivo ahora' : 'Próximo evento'}</div>
           <h1>{proximo.nombre}</h1>
-          <p className="meta">10:00 a 11:00 am · {proximo.misterios} · {proximo.faltan}</p>
+          <p className="meta">
+            10:00 a 11:00 am · {proximo.faltan} ·{' '}
+            {temaProximo?.tema
+              ? <><b>{temaProximo.tema}</b> <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Editar</button></>
+              : <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Poner tema</button>}
+          </p>
           {tProximo?.dirige ? (
             <p className="meta" style={{ margin: 0 }}>
               <b>{quienes(tProximo)}</b>{' '}
@@ -209,6 +239,14 @@ export default function Inicio({ ir }) {
         </section>
       )}
 
+      {estado && faltanTema.length > 0 && (
+        <p className="aviso-tema" role="status">
+          Falta tema para {faltanTema.map((t) => nombreFechaCorto(t.fecha)).join(' y ')}. Lo ideal es tener siempre
+          los próximos 2 eventos con tema (así la difusión sale con tiempo).{' '}
+          <button className="enlace" onClick={() => abrirCalendario(faltanTema[0].fecha)}>Poner tema</button>
+        </p>
+      )}
+
       <section className="tarjeta proceso">
         <div className="proceso-cabeza">
           <div>
@@ -216,7 +254,7 @@ export default function Inicio({ ir }) {
             {avance && (
               <div className="evento-nav">
                 <button className="btn suave chico" onClick={() => cambiarEvento(-1)} aria-label="Evento anterior">‹</button>
-                <b aria-live="polite">{avance.nombre}</b>
+                <b aria-live="polite">{avance.nombre}{avance.tema && <span className="evento-tema"> · {avance.tema}</span>}</b>
                 <button className="btn suave chico" onClick={() => cambiarEvento(1)} aria-label="Evento siguiente">›</button>
                 {fechaSel && <button className="enlace" onClick={() => { setFechaSel(null); previo.current = null }}>Ir al que toca</button>}
               </div>
@@ -256,6 +294,7 @@ export default function Inicio({ ir }) {
                   {p.detalle.map((d) => <p key={d} className="chico-texto">{d}</p>)}
                   <p className="chico-texto paso-que">{p.x}</p>
                   {item && <p className="chico-texto"><b>Cómo se cumple:</b> {item.como}</p>}
+                  {abierto && extraDe(p.id) && !esActual && <div className="paso-extra">{extraDe(p.id)}</div>}
                   <div className="botones paso-accion">
                     {esActual && <button className="btn chico" disabled={ocupado} onClick={() => marcar(p.id, 'hecho')}>Marcar como hecho</button>}
                     {esActual && <button className="btn suave chico" disabled={ocupado} onClick={() => marcar(p.id, 'omitir')}>Omitir: no es necesario</button>}
@@ -287,12 +326,22 @@ export default function Inicio({ ir }) {
       <Modal abierto={modal === 'reporte'} titulo="Reporte semanal" alCerrar={() => setModal(null)}>
         <ReporteSemanal alCambiar={cargar} />
       </Modal>
+
+      <Modal abierto={modal === 'tema'} titulo={temaFecha ? `Tema del ${nombreFechaCorto(temaFecha).toLowerCase()}` : 'Tema del evento'}
+        alCerrar={() => setModal(null)}>
+        {temaFecha && <TemaEvento fecha={temaFecha} alGuardar={cargar} />}
+      </Modal>
+
+      <Modal abierto={modal === 'subir'} titulo={avance ? `Subir grabación del ${avance.nombre.toLowerCase()}` : 'Subir grabación'}
+        alCerrar={() => setModal(null)}>
+        {avance && <SubirGrabacion fecha={avance.fecha} alTerminar={cargar} />}
+      </Modal>
     </>
   )
 }
 
 /** El paso en el que va el evento, con lo que hay que hacer para cumplirlo. */
-function Guia({ avance, actual, item, accion, ocupado, alMarcar }) {
+function Guia({ avance, actual, item, accion, extra, ocupado, alMarcar }) {
   if (avance.completo) {
     return (
       <div className="guia completo">
@@ -308,6 +357,7 @@ function Guia({ avance, actual, item, accion, ocupado, alMarcar }) {
       <h3>{actual.t}</h3>
       {item?.detalle && <p className="paso-resumen">{item.detalle}</p>}
       <p>{item?.como}</p>
+      {extra && <div className="paso-extra">{extra}</div>}
       <div className="botones">
         <button className="btn chico" disabled={ocupado} onClick={() => alMarcar(actual.id, 'hecho')}>Marcar como hecho</button>
         <button className="btn suave chico" disabled={ocupado} onClick={() => alMarcar(actual.id, 'omitir')}>Omitir: no es necesario</button>

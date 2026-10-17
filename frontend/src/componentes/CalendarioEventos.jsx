@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { ahoraCDMX, claveFecha, esDiaDeEvento, fechaCorta, infoEvento, proximoEvento } from '../evento.js'
 import { fechaDeClave } from '../util.js'
+import TemaEvento from './TemaEvento.jsx'
 import Turnos from './Turnos.jsx'
 
 const DIA_MS = 24 * 60 * 60 * 1000
@@ -26,6 +27,7 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
   const inicial = fechaInicial ? fechaDeClave(fechaInicial) : hoy
   const [mes, setMes] = useState({ anio: inicial.getUTCFullYear(), mes: inicial.getUTCMonth() })
   const [turnos, setTurnos] = useState({})
+  const [temas, setTemas] = useState({})
   const [elegido, setElegido] = useState(() => fechaInicial ?? proximoEvento()?.clave ?? null)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
@@ -37,8 +39,8 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
   const hasta = claveFecha(dias[dias.length - 1])
 
   function cargar() {
-    return api(`/api/turnos?desde=${desde}&hasta=${hasta}`)
-      .then((d) => { setTurnos(d.turnos); setError('') })
+    return Promise.all([api(`/api/turnos?desde=${desde}&hasta=${hasta}`), api(`/api/temas?desde=${desde}&hasta=${hasta}`)])
+      .then(([d, t]) => { setTurnos(d.turnos); setTemas(t.temas); setError('') })
       .catch((e) => setError(e.message))
   }
   useEffect(() => { cargar() }, [desde, hasta])
@@ -101,6 +103,7 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
               return <div key={clave} className={`cal-celda ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`} role="gridcell"><span className="cal-num">{d.getUTCDate()}</span></div>
             }
             const t = turnos[clave]
+            const tema = temas[clave]?.titulo
             const i = infoEvento(d)
             const pasado = i.estado === 'pasado' || i.estado === 'hoy-terminado'
             const tono = pasado ? 'pasado' : t?.dirige ? 'asignado' : 'hueco'
@@ -108,8 +111,9 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
               <button key={clave} role="gridcell" aria-selected={elegido === clave}
                 className={`cal-celda evento ${tono} ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`}
                 onClick={() => { setElegido(clave); setAviso('') }}
-                aria-label={`${i.nombre}: ${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}${t?.apoyan.length ? `, apoya ${t.apoyan.map((x) => x.nombre).join(', ')}` : ''}`}>
+                aria-label={`${i.nombre}: ${tema ? `tema ${tema}, ` : 'sin tema, '}${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}${t?.apoyan.length ? `, apoya ${t.apoyan.map((x) => x.nombre).join(', ')}` : ''}`}>
                 <span className="cal-num">{d.getUTCDate()}</span>
+                <span className={`cal-tema ${tema ? '' : 'falta'}`}>{tema ?? (pasado ? '' : 'Sin tema')}</span>
                 {t ? (
                   <>
                     <span className="cal-quien">{primerNombre(t.dirige) ?? (pasado ? '' : 'Sin asignar')}</span>
@@ -125,6 +129,7 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
           <span className="cal-leyenda"><i className="asignado" />Asignado</span>
           <span className="cal-leyenda"><i className="hueco" />Sin asignar</span>
           <span className="cal-leyenda"><i className="pasado" />Ya pasó</span>
+          <span className="cal-leyenda"><i className="sin-tema" />Sin tema</span>
           <button className="btn suave chico" onClick={repartir} disabled={ocupado}>Llenar huecos automáticamente</button>
         </div>
         {aviso && <p className="chico-texto" role="status">{aviso}</p>}
@@ -132,7 +137,10 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
 
         {info && (
           <div className="cal-detalle">
-            <h3>{info.nombre} <span className="muted">· {info.misterios} · {info.faltan}</span></h3>
+            <h3>{info.nombre} <span className="muted">· {info.faltan}</span></h3>
+            <TemaEvento key={`tema-${elegido}`} fecha={elegido}
+              alGuardar={(t) => { if (t) setTemas((x) => ({ ...x, [elegido]: t })); alCambiar?.() }} />
+            <h3 className="cal-sub">Quién dirige y quién apoya</h3>
             <Turnos key={elegido} clave={elegido} yaPaso={yaPaso} ir={ir} alGuardar={(c, t) => { guardado(c, t); setVersion((v) => v + 1) }} />
           </div>
         )}
