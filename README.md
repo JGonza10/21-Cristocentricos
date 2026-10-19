@@ -111,3 +111,13 @@ por PostgreSQL y revisar el checklist de seguridad con Claude antes.
 ## Privacidad
 El calendario del equipo (fase 6) guardará nombre y correo de los integrantes. Se mostrará un
 aviso de privacidad breve (LFPDPPP) explicando que solo se usan para enviar los turnos.
+
+## Herramienta: música y cortes suaves
+`herramientas/musica_y_cortes.py` toma la música de un video (p. ej. el del cliente) y la pone en otro,
+cambiando los cortes bruscos por fundidos. Solo necesita ffmpeg.
+
+```powershell
+python herramientas\musica_y_cortes.py --cliente cliente.mp4 --nuestro fatima.mp4 --salida fatima_final.mp4 --suavizar-cortes
+```
+Opciones útiles: `--musica-inicio/--musica-fin` (tramo de la música), `--cortes 4.2 9.8` (cortes a mano),
+`--umbral 6` (detecta más cortes), `--transicion dissolve`, `--sin-voz`, `--volumen 0.8`.
