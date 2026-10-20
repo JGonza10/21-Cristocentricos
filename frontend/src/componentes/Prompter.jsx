@@ -49,6 +49,42 @@ export default function Prompter({ texto }) {
     return () => cancelAnimationFrame(id)
   }, [corriendo, velocidad])
 
+  // Karaoke (Gonza, 2026-10-20): cada palabra que cruza la línea dorada de lectura se pinta de oro;
+  // la línea que se está leyendo se resalta más. Se calcula con la posición real de cada palabra,
+  // así funciona igual al cambiar el tamaño de letra, en espejo o moviendo el texto a mano.
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return undefined
+    const palabras = [...el.querySelectorAll('.pp')]
+    let leidas = -1
+    let renglon = null
+    function marcar() {
+      const lectura = el.scrollTop + el.clientHeight * 0.33
+      let lo = 0
+      let hi = palabras.length - 1
+      let n = -1
+      while (lo <= hi) {             // última palabra cuyo centro ya pasó la línea de lectura
+        const m = (lo + hi) >> 1
+        const w = palabras[m]
+        if (w.offsetTop + w.offsetHeight / 2 <= lectura) { n = m; lo = m + 1 } else hi = m - 1
+      }
+      if (n !== leidas) {
+        const [a, b] = n > leidas ? [leidas + 1, n] : [n + 1, leidas]
+        for (let i = a; i <= b; i++) palabras[i]?.classList.toggle('leida', i <= n)
+        leidas = n
+      }
+      const top = n >= 0 ? palabras[n].offsetTop : null
+      if (top !== renglon) {
+        palabras.forEach((w) => w.classList.toggle('actual', top !== null && w.offsetTop === top))
+        renglon = top
+      }
+    }
+    marcar()
+    el.addEventListener('scroll', marcar, { passive: true })
+    window.addEventListener('resize', marcar)
+    return () => { el.removeEventListener('scroll', marcar); window.removeEventListener('resize', marcar) }
+  }, [texto, tamano])
+
   useEffect(() => {
     function tecla(e) {
       if (e.target.closest?.('input, textarea, select')) return
@@ -84,7 +120,9 @@ export default function Prompter({ texto }) {
         <div className="prompter-guia" aria-hidden="true" />
         <div ref={caja} className={`prompter-texto ${espejo ? 'espejo' : ''}`} style={{ fontSize: `${tamano}px` }} tabIndex={0}>
           <div className="prompter-relleno" />
-          {texto.split(/\n{2,}/).map((parrafo, i) => <p key={i}>{parrafo}</p>)}
+          {texto.split(/\n{2,}/).map((parrafo, i) => (
+            <p key={i}>{parrafo.split(/(\s+)/).map((t, j) => (/^\s+$/.test(t) || !t ? t : <span key={j} className="pp">{t}</span>))}</p>
+          ))}
           <div className="prompter-relleno" />
         </div>
       </div>

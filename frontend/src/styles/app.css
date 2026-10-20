@@ -178,8 +178,8 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
 
 /* Hero del próximo evento con la imagen de la Virgen */
 .hero.con-virgen{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:center;overflow:hidden}
-.hero-virgen{height:clamp(160px,24vw,250px);width:auto;display:block;opacity:.95;margin-block:-8px}
-@media (max-width:560px){.hero.con-virgen{grid-template-columns:1fr 64px}.hero-virgen{height:150px}}
+.hero-virgen{height:clamp(110px,15vw,160px);width:auto;display:block;opacity:.95}
+@media (max-width:560px){.hero.con-virgen{grid-template-columns:1fr 44px}.hero-virgen{height:110px}}
 
 /* Prompter (pantalla completa): letras claras sobre fondo negro, línea guía a un tercio de la altura */
 .prompter{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
@@ -211,3 +211,8 @@ legend{font-weight:700;font-size:.88rem;margin-bottom:6px;padding:0}
 /* Oro: la pestaña activa lleva letra oscura sobre el oro (blanco sobre oro casi no se lee) */
 :root[data-theme="dark"] .pestanas button[aria-selected="true"]{color:var(--on-accent)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pestanas button[aria-selected="true"]{color:var(--on-accent)}}
+/* Karaoke del prompter: lo leído en oro, el renglón que se lee más brillante, lo que falta en blanco */
+.prompter-texto .pp{transition:color .25s}
+.prompter-texto .pp.leida{color:#c9a253}
+.prompter-texto .pp.actual{color:#ffd77a;text-shadow:0 0 18px rgba(226,178,92,.45)}
+@media (prefers-reduced-motion:reduce){.prompter-texto .pp{transition:none}}
