@@ -4,5 +4,7 @@ Flask-WTF==1.2.2
 bcrypt==4.3.0
 python-dotenv==1.2.2
 waitress==3.0.2
+pypdf==6.21.1
+Pillow==13.0.0
 pytest==9.0.3
 pip-audit==2.9.0

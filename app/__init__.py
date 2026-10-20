@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
-from . import auth, cli, errores
+from . import auth, cli, errores, eventos
 from .extensiones import csrf, db
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -44,6 +44,7 @@ def create_app(config: dict | None = None) -> Flask:
         LOGIN_MAX_FALLOS_IP=20,
         LOGIN_VENTANA_MIN=15,
         FRONTEND_DIST=RAIZ / "frontend" / "dist",
+        PAQUETES_DIR=RAIZ / "paquetes",
         LOG_DIR=RAIZ / "datos" / "logs",
     )
     if config:
@@ -55,6 +56,7 @@ def create_app(config: dict | None = None) -> Flask:
     db.init_app(app)
     csrf.init_app(app)
     app.register_blueprint(auth.bp)
+    app.register_blueprint(eventos.bp)
     errores.registrar(app)
     cli.registrar(app)
     _registrar_frontend(app)
@@ -65,7 +67,7 @@ def create_app(config: dict | None = None) -> Flask:
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "same-origin")
         resp.headers.setdefault("Content-Security-Policy", CSP)
-        resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
         return resp
 
     with app.app_context():
