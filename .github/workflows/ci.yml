@@ -48,3 +48,5 @@ jobs:
         run: npm audit --audit-level=high
       - name: Compilar
         run: npm run build
+      - name: Pruebas del prompter (node:test)
+        run: npm test

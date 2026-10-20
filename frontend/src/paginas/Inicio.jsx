@@ -22,8 +22,8 @@ export default function Inicio({ ir }) {
           <h1>{proximo.nombre}</h1>
           <p className="meta">10:00 a 11:00 am · {proximo.misterios} · {proximo.faltan}</p>
           <p className="aviso">
-            Todavía no se asigna quién dirige.{' '}
-            <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Asignar ahora</button>
+            Prepara el evento: fecha, tema y guion.{' '}
+            <button className="enlace" onClick={() => ir('evento', proximo.clave)}>Ir al paso 1</button>
           </p>
         </section>
       )}
@@ -37,13 +37,14 @@ export default function Inicio({ ir }) {
         </article>
         <article className="tarjeta">
           <span className="etiqueta">Agentes</span>
-          <div className="estado off">Aún no activos</div>
-          <p className="chico-texto">Vigilarán las grabaciones, prepararán el carrusel 2 días antes y repartirán los turnos los domingos a las 6 pm. Se activan en las fases 3 a 6.</p>
+          <div className="estado ok">Imágenes de difusión listas</div>
+          <p className="chico-texto">Las imágenes se generan en el paso 2 de cada evento. Los reels y la publicación llegan en las fases 4 y 5.</p>
         </article>
         <article className="tarjeta">
-          <span className="etiqueta">Invitaciones</span>
-          <div className="estado warn">Correo sin configurar</div>
-          <p className="chico-texto">Se conecta con Google Calendar en la fase 6.</p>
+          <span className="etiqueta">Calendario</span>
+          <div className="estado ok">Equipo y temas</div>
+          <p className="chico-texto" style={{ marginBottom: 12 }}>Nombres del equipo y tema de cada fecha.</p>
+          <button className="btn suave chico" onClick={() => ir('calendario')}>Abrir calendario</button>
         </article>
       </section>
 
@@ -54,7 +55,7 @@ export default function Inicio({ ir }) {
             <li key={r.clave} className={`item ${r.estado === 'pasado' || r.estado === 'hoy-terminado' ? 'pasado' : ''} ${r.estado === 'hoy' || r.estado === 'en-vivo' ? 'hoy' : ''}`}>
               <div>
                 <b>{r.nombre}{ETIQUETA_ESTADO[r.estado] && <span className={`pill ${r.estado.startsWith('hoy') || r.estado === 'en-vivo' ? '' : 'gris'}`}>{ETIQUETA_ESTADO[r.estado]}</span>}</b>
-                <span className="muted">Sin asignar · {r.misterios.toLowerCase()}</span>
+                <span className="muted">{r.misterios}</span>
               </div>
               <button className="btn suave chico" onClick={() => ir('evento', r.clave)}>Ver</button>
             </li>

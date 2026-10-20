@@ -11,12 +11,17 @@ export function olvidarCsrf() {
   csrf = null
 }
 
-export async function api(ruta, { metodo = 'GET', datos } = {}) {
+export async function api(ruta, { metodo = 'GET', datos, archivo } = {}) {
   const opciones = { method: metodo, credentials: 'same-origin', headers: { Accept: 'application/json' } }
   if (metodo !== 'GET') {
-    opciones.headers['Content-Type'] = 'application/json'
     opciones.headers['X-CSRFToken'] = csrf || (await obtenerCsrf())
-    opciones.body = JSON.stringify(datos ?? {})
+    if (archivo) {
+      opciones.body = new FormData()
+      opciones.body.append('archivo', archivo)
+    } else {
+      opciones.headers['Content-Type'] = 'application/json'
+      opciones.body = JSON.stringify(datos ?? {})
+    }
   }
   let r
   try {

@@ -37,3 +37,8 @@
   --off:#6e6479; --shadow:none;
   color-scheme: dark;
 }
+
+/* Prompter: siempre oscuro y con mucho contraste, en cualquier tema (se lee de lejos). */
+:root {
+  --pr-bg:#0d0a12; --pr-ink:#ffffff; --pr-leido:#6f6680; --pr-actual:#c9a8f5; --pr-cue:#e6b84e; --pr-barra:#1e1828;
+}

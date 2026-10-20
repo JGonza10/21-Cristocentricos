@@ -11,11 +11,18 @@ nada se publica sin visto bueno humano.
 - **Agente de reels:** al guardarse la grabación (`grabaciones/`), transcribe, elige 3 momentos
   (< 60 s), los pasa a vertical 9:16 con subtítulos y nombre del canal → bandeja.
 - **Agente de carrusel:** 2 días antes de cada lunes/viernes genera 5 imágenes blanco/vino
-  (invitación, misterios del día —lunes gozosos, viernes dolorosos—, en vivo, intenciones, cierre) + texto.
+  (invitación, 2 frases del guion, en vivo, cierre) + texto. Hoy se generan a mano en el paso 2 del evento.
 - **Agente de publicación:** solo actúa sobre lo aprobado. Crea `subir_manual/<red>/` con archivos
   y `texto.txt`; YouTube sube directo (privado hasta verificar la app de Google).
-- **Calendario del equipo:** turnos (dirige / apoya), reparto automático domingos 6 pm,
-  invitaciones a Google Calendar.
+- **Pasos de cada evento (consecutivos, cada uno desbloquea el siguiente):**
+  1. Fecha, hora, tema y guion (PDF/.md → Markdown) + frases para difusión.
+  2. Imágenes de difusión con tema y fecha (5, blanco/vino).
+  3. Revisión técnica del día (audio, StreamYard, grabación, reloj, **prompter**).
+  4. Transmisión → 5. Reels → 6. Bandeja y publicación.
+- **Sin "intenciones recibidas" ni "cita bíblica"**: se quitan solas del guion y no hay lámina de intenciones.
+- **Prompter** (`#prompter/<fecha>`): en la tableta, avanza al escuchar la lectura (Web Speech API, es-MX,
+  solo hacia adelante), se pausa, ◀ ▶ por párrafo, tocar palabra para saltar. Líneas `>` = indicaciones.
+- **Calendario del equipo:** solo el calendario, los nombres del equipo (agregar/quitar, asignar al día) y el tema.
 - **Reloj en vivo:** hora CDMX + cuenta regresiva, overlay para transmitir (temas oscuro/perla/verde chroma).
 - Redes: Instagram, Facebook, TikTok, YouTube y canal de TV (StreamYard).
 
@@ -40,13 +47,14 @@ nada se publica sin visto bueno humano.
 3. Arma candidatos de 30–55 s que empiecen al inicio de una frase y terminen al final de otra.
 4. Puntúa: anuncio de misterio > intenciones > oración completa; evita silencios (ffmpeg `silencedetect`).
 5. Elige 3 sin traslape, repartidos en el rosario. Subtítulos `.srt` quemados con ffmpeg + nombre del canal.
+   La imagen al centro del reel es **opcional** (no es regla).
 6. Texto y hashtags salen de plantillas por tipo de misterio (gozosos/dolorosos).
 7. Si algo falla, la bandeja permite ajustar inicio/fin a mano antes de aprobar.
 
 ### 2.2 Usuarios y roles
 - **2 cuentas con el mismo permiso**: Gonza + 1 aprobador. Ambos aprueban, rechazan y editan textos.
 - Sin registro público (es app local): las cuentas se crean con `flask crear-usuario`.
-- Los integrantes del calendario **no tienen cuenta**: solo nombre + correo para invitaciones.
+- Los integrantes del calendario **no tienen cuenta**: solo su nombre.
 
 ## 3. Estructura
 ```
@@ -160,6 +168,7 @@ cd frontend; npm run build; cd ..
 .\iniciar.bat
 
 pytest -q
+cd frontend; npm test; cd ..       # lógica del prompter
 pip-audit
 ```
 Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
@@ -170,11 +179,13 @@ Requisito externo: **ffmpeg** en el PATH (`winget install Gyan.FFmpeg`).
 3. **Agente de carrusel** (5 imágenes, 2 días antes de lunes/viernes)
 4. **Agente de reels** (watchdog + Whisper + reglas §2.1 + ffmpeg)
 5. **Agente de publicación** (`subir_manual/<red>/` + YouTube API en privado)
-6. **Calendario del equipo** (turnos, reparto domingos 6 pm, Google Calendar)
+6. **Calendario del equipo** (fechas, tema y nombres del equipo — versión simple ya hecha)
 7. **Reloj en vivo** + overlay de transmisión (oscuro / perla / verde chroma)
 8. (Futuro) Publicación automática en Meta
 
-**Estado:** fase 1 terminada (2026-10-16) — 24 pruebas, pip-audit y npm audit sin vulnerabilidades.
+**Estado:** fase 1 terminada (2026-10-16). 2026-10-20: pasos 1–3 del evento, imágenes de difusión
+(adelanta la fase 3), prompter y calendario simple. 40 pruebas pytest + 10 de `npm test` (node:test).
+Prueba completa el jueves 22 (guion `guiones/2026-10-22-no-tengas-miedo.md`); en vivo el lunes 26.
 
 Cada fase termina con: pruebas `pytest`, revisión de seguridad y archivos completos entregados.
 

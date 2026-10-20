@@ -3,7 +3,7 @@
 Convierte cada Santo Rosario en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
 invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
 
-**Estado:** fase 1 (inicio de sesión seguro). Ver `CLAUDE.md` para el plan completo.
+**Estado:** fase 1 (inicio de sesión seguro) + pasos del evento, imágenes de difusión, prompter y calendario. Ver `CLAUDE.md` para el plan completo.
 
 ## Requisitos (Windows)
 - Python 3.12 o superior
@@ -68,6 +68,27 @@ internet y no se abren puertos en el módem. Funciona igual si están en la mism
 
 **Importante:** tu PC debe estar encendida y con `iniciar.bat` abierto para que el aprobador entre.
 
+## Pasos de cada evento
+En la pestaña **Evento** (o desde el **Calendario**) cada paso se desbloquea al terminar el anterior:
+1. **Fecha, tema y guion.** Sube el PDF o un `.md` del programa (se convierte solo a Markdown) o pega
+   el texto. Se quitan solas las secciones "intenciones recibidas" y "cita bíblica". Las líneas que
+   empiezan con `>` son indicaciones: el prompter las muestra en amarillo y no las sigue.
+   Revisa las frases para difusión (las 2 primeras salen en las imágenes).
+2. **Imágenes de difusión.** 5 imágenes 1080×1350 en blanco y vino; quedan en `paquetes/<fecha>/difusion/`.
+   Si cambias tema, fecha, hora o frases, hay que volver a generarlas.
+3. **Revisión técnica del día**, con el botón **Abrir prompter**.
+
+## Prompter en la tableta
+1. Instala Tailscale en la tableta y acepta la invitación a tu PC (igual que el aprobador).
+2. Abre `https://pc-gonza.algo.ts.net` en **Chrome** (Android) o **Safari** (iPad) y entra con tu usuario.
+   Tiene que ser la dirección `https`: sin ella el navegador no deja usar el micrófono.
+3. Evento → Revisión técnica → **Abrir prompter** → **Escuchar** y acepta el permiso del micrófono.
+4. El texto avanza conforme se lee. **Pausa** lo detiene; ◀ ▶ saltan de párrafo; tocar una palabra
+   lleva el prompter ahí; A− / A+ cambian el tamaño; ⇋ es modo espejo. Con teclado: espacio y flechas.
+
+El reconocimiento de voz del navegador necesita internet (Google o Apple procesan el audio). Si se
+corta la red, el prompter se maneja con los botones.
+
 ## Desarrollo
 ```powershell
 # Ventana 1: API
@@ -91,6 +112,7 @@ cd frontend; npm run dev          # abre http://localhost:5173
 flask --app app crear-usuario
 flask --app app cambiar-password gonza
 pytest                 # pruebas
+cd frontend; npm test  # pruebas del prompter
 pip-audit              # dependencias vulnerables (Python)
 cd frontend; npm audit # dependencias vulnerables (JavaScript)
 ```
@@ -109,5 +131,5 @@ No se publica en internet: es una app local. Si algún día se sube a Railway, c
 por PostgreSQL y revisar el checklist de seguridad con Claude antes.
 
 ## Privacidad
-El calendario del equipo (fase 6) guardará nombre y correo de los integrantes. Se mostrará un
-aviso de privacidad breve (LFPDPPP) explicando que solo se usan para enviar los turnos.
+El calendario del equipo guarda solo el nombre de los integrantes, para organizar quién participa en
+cada fecha. No se guardan correos ni se comparte con nadie (aviso breve en la pantalla, LFPDPPP).

@@ -1,8 +1,6 @@
 # Capítulo 1. No tengas miedo
 
 > Cristocéntricos · programa matutino · por Esbeidy Solís
-> Formato para el prompter: el texto normal se lee en voz alta (el prompter lo sigue al escuchar).
-> Las líneas que empiezan con «>» son indicaciones: se ven en otro color y no se leen.
 
 ## Frase introductoria
 
