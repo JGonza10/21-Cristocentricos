@@ -180,5 +180,16 @@ def test_integrantes_y_calendario(sesion):
     assert sesion.get("/api/eventos?mes=2026-10").get_json()["eventos"][0]["integrantes"] == []
 
 
+def test_proximos_eventos(sesion, monkeypatch):
+    from datetime import date
+    from app import eventos
+    monkeypatch.setattr(eventos, "hoy_cdmx", lambda: date(2026, 10, 20))
+    for f, t in [("2026-10-19", "Pasado"), ("2026-10-26", "Lunes"), ("2026-10-22", "Jueves")]:
+        _put(sesion, f"/api/eventos/{f}", {"tema": t})
+    d = sesion.get("/api/eventos/proximos").get_json()
+    assert [e["tema"] for e in d["eventos"]] == ["Jueves", "Lunes"]
+    assert d["hoy"] == "2026-10-20"
+
+
 def test_microfono_permitido_para_el_prompter(cliente):
     assert "microphone=(self)" in cliente.get("/api/auth/csrf").headers["Permissions-Policy"]

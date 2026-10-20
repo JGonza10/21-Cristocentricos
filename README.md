@@ -1,14 +1,12 @@
-# Cristocéntricos Automático
+# Cristocéntricos
 
-Convierte cada Santo Rosario en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
-invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
-
-**Estado:** fase 1 (inicio de sesión seguro) + pasos del evento, imágenes de difusión, prompter y calendario. Ver `CLAUDE.md` para el plan completo.
+Prepara cada programa en vivo del equipo en 3 pasos: **fecha, tema y guion** → **imágenes de
+difusión** → **revisión técnica con prompter**. Incluye un calendario con el tema de cada fecha y los
+nombres del equipo. Corre en la PC de Gonza.
 
 ## Requisitos (Windows)
 - Python 3.12 o superior
 - Node.js 20 o superior
-- ffmpeg (para las fases de video): `winget install Gyan.FFmpeg`
 
 ## Repositorio
 https://github.com/JGonza10/21-Cristocentricos (público: nunca subir `.env`, la base de datos ni videos).
@@ -41,6 +39,13 @@ npm install
 npm run build
 cd ..
 ```
+
+## Empezar en blanco (antes de la primera prueba)
+```powershell
+flask --app app limpiar-datos                 # borra eventos, equipo e imágenes; deja las cuentas
+flask --app app limpiar-datos --con-usuarios  # también borra las cuentas (luego: crear-usuario)
+```
+Pide confirmación antes de borrar.
 
 ## Uso diario
 Doble clic en `iniciar.bat`. Se abre la ventana del servidor (no la cierres) y el navegador en
@@ -111,6 +116,7 @@ cd frontend; npm run dev          # abre http://localhost:5173
 ```powershell
 flask --app app crear-usuario
 flask --app app cambiar-password gonza
+flask --app app limpiar-datos
 pytest                 # pruebas
 cd frontend; npm test  # pruebas del prompter
 pip-audit              # dependencias vulnerables (Python)

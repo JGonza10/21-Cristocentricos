@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { ahoraCDMX, claveFecha, nombreFecha } from '../rosario.js'
+import { ahoraCDMX, claveFecha, nombreFecha } from '../fechas.js'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto',
   'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -102,7 +102,7 @@ export default function Calendario({ ir }) {
       </section>
 
       <section className="tarjeta">
-        <span className="etiqueta">{nombreFecha(new Date(`${elegido}T00:00:00Z`))}</span>
+        <span className="etiqueta">{nombreFecha(elegido)}</span>
         <h2 className="cal-tema">{ev?.tema || 'Sin tema'}</h2>
         <span className="label">Equipo de este día</span>
         {equipo.length === 0 ? <p className="chico-texto">Agrega nombres abajo para poder elegirlos.</p> : (

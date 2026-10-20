@@ -1,20 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { nombreFecha } from '../rosario.js'
+import { nombreFecha } from '../fechas.js'
 
 const PASOS = [
   { id: 'datos', titulo: 'Fecha, tema y guion' },
   { id: 'imagenes', titulo: 'Imágenes de difusión' },
   { id: 'revision', titulo: 'Revisión técnica del día' },
 ]
-
-const DESPUES = [
-  { titulo: 'Transmisión en vivo', texto: 'Se transmite con el prompter en la tableta. La grabación se guarda en la carpeta grabaciones.' },
-  { titulo: 'Reels', texto: '3 momentos de menos de un minuto, en vertical y con subtítulos. La imagen al centro es opcional: se pone solo cuando la quieran.', fase: 4 },
-  { titulo: 'Bandeja y publicación', texto: 'Se aprueba o rechaza cada pieza; nada se publica sin visto bueno.', fase: 5 },
-]
-
-const fechaUTC = (f) => new Date(`${f}T00:00:00Z`)
 
 export default function Evento({ fecha, ir }) {
   const [ev, setEv] = useState(null)
@@ -37,7 +29,7 @@ export default function Evento({ fecha, ir }) {
       <section className="hero">
         <div className="etiqueta">Evento · paso {Math.min(listos + 1, 3)} de 3</div>
         <h1>{ev.tema || 'Sin tema todavía'}</h1>
-        <p className="meta">{nombreFecha(fechaUTC(ev.fecha))} · {ev.hora} hrs</p>
+        <p className="meta">{nombreFecha(ev.fecha)} · {ev.hora} hrs</p>
         <ol className="avance" aria-label="Avance de los pasos">
           {PASOS.map((p, i) => (
             <li key={p.id} className={ev.pasos[p.id] ? 'hecho' : abierto === p.id ? 'actual' : ''}>
@@ -51,12 +43,12 @@ export default function Evento({ fecha, ir }) {
       <PasoImagenes ev={ev} setEv={setEv} bloqueado={!ev.pasos.datos} />
       <PasoRevision ev={ev} setEv={setEv} bloqueado={!ev.pasos.imagenes} ir={ir} />
 
-      {DESPUES.map((d, i) => (
-        <section key={d.titulo} className={`tarjeta paso ${ev.pasos.revision ? '' : 'bloqueado'}`}>
-          <Encabezado numero={i + 4} titulo={d.titulo} hecho={false} />
-          <p className="chico-texto">{d.texto}{d.fase ? ` Llega en la fase ${d.fase}.` : ''}</p>
+      {ev.pasos.revision && (
+        <section className="tarjeta paso">
+          <p className="estado ok">Todo listo para transmitir</p>
+          <p className="chico-texto">Al terminar, descarga la grabación de StreamYard y guárdala para los reels.</p>
         </section>
-      ))}
+      )}
     </>
   )
 }
@@ -84,16 +76,18 @@ function PasoDatos({ ev, setEv, ir, abierto }) {
   const [msg, setMsg] = useState({ texto: '', error: false })
   const [ocupado, setOcupado] = useState(false)
 
-  function cargar(e) {
-    setTema(e.tema); setHora(e.hora); setGuion(e.guion_md); setFrases(e.frases); setEv(e)
+  // Al subir el guion o sugerir frases solo cambian guion y frases: lo que escribiste sin guardar se queda.
+  function cargar(e, todo = true) {
+    if (todo) { setTema(e.tema); setHora(e.hora) }
+    setGuion(e.guion_md); setFrases(e.frases); setEv(e)
   }
 
-  async function correr(accion, exito) {
+  async function correr(accion, exito, todo = false) {
     setOcupado(true)
     setMsg({ texto: '', error: false })
     try {
       const d = await accion()
-      cargar(d.evento)
+      cargar(d.evento, todo)
       setMsg({ texto: exito, error: false })
     } catch (e) {
       setMsg({ texto: e.message, error: true })
@@ -105,7 +99,7 @@ function PasoDatos({ ev, setEv, ir, abierto }) {
   const guardar = (e) => {
     e.preventDefault()
     correr(() => api(`/api/eventos/${ev.fecha}`, { metodo: 'PUT', datos: { tema, hora, guion_md: guion, frases: frases.filter((f) => f.trim()) } }),
-      'Guardado.')
+      'Guardado.', true)
   }
 
   const subir = (e) => {

@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import { api, olvidarCsrf } from './api.js'
 import { aplicarTema, temaActual } from './tema.js'
 import { Luna, Sol } from './iconos.jsx'
-import { ahoraCDMX, claveFecha, proximoRosario } from './rosario.js'
+import { ahoraCDMX, claveFecha } from './fechas.js'
 import Login from './paginas/Login.jsx'
 import Inicio from './paginas/Inicio.jsx'
-import Contenido from './paginas/Contenido.jsx'
 import Evento from './paginas/Evento.jsx'
 import Calendario from './paginas/Calendario.jsx'
 import Prompter from './paginas/Prompter.jsx'
@@ -13,7 +12,6 @@ import Configuracion from './paginas/Configuracion.jsx'
 
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
-  { id: 'contenido', nombre: 'Contenido' },
   { id: 'evento', nombre: 'Evento' },
   { id: 'calendario', nombre: 'Calendario' },
   { id: 'configuracion', nombre: 'Configuración', corto: 'Ajustes' },
@@ -27,7 +25,7 @@ function leerUrl() {
   return { id: PESTANAS.some((p) => p.id === id) ? id : 'inicio', fecha: valida }
 }
 
-const fechaPorOmision = () => proximoRosario()?.clave || claveFecha(ahoraCDMX())
+const fechaPorOmision = () => claveFecha(ahoraCDMX())
 
 export default function App() {
   const [usuario, setUsuario] = useState(undefined) // undefined = revisando sesión
@@ -94,7 +92,6 @@ export default function App() {
 
       <main className="envoltura" role="tabpanel">
         {pestana === 'inicio' && <Inicio ir={ir} />}
-        {pestana === 'contenido' && <Contenido />}
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'calendario' && <Calendario ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}

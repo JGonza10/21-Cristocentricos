@@ -1,6 +1,6 @@
 """Eventos (programas en vivo) y sus pasos: /api/eventos/... e /api/integrantes."""
 import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
@@ -20,6 +20,11 @@ GUION_MAX = 100_000
 ARCHIVO_MAX = 10 * 1024 * 1024
 MSG_PASO_1 = "Primero completa el paso 1: tema y guion."
 MSG_PASO_2 = "Primero genera las imágenes de difusión (paso 2)."
+
+
+def hoy_cdmx() -> date:
+    """Fecha de hoy en la Ciudad de México (UTC-6, sin horario de verano desde 2022)."""
+    return datetime.now(timezone(timedelta(hours=-6))).date()
 
 
 def _fecha(texto: str) -> date | None:
@@ -56,6 +61,13 @@ def listar():
     fin = date(anio + (mes == 12), mes % 12 + 1, 1)
     eventos = Evento.query.filter(Evento.fecha >= inicio, Evento.fecha < fin).order_by(Evento.fecha).all()
     return jsonify(eventos=[e.a_dict(completo=False) for e in eventos])
+
+
+@bp.get("/eventos/proximos")
+@login_requerido
+def proximos():
+    eventos = Evento.query.filter(Evento.fecha >= hoy_cdmx()).order_by(Evento.fecha).limit(5).all()
+    return jsonify(eventos=[e.a_dict(completo=False) for e in eventos], hoy=hoy_cdmx().isoformat())
 
 
 @bp.get("/eventos/<fecha>")

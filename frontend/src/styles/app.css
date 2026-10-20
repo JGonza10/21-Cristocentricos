@@ -22,7 +22,6 @@ button{font-family:inherit}
 .btn:disabled{opacity:.5;cursor:default}
 .btn:not(:disabled):hover{filter:brightness(1.05)}
 .btn.suave:not(:disabled):hover{box-shadow:inset 0 0 0 1.5px var(--accent)}
-.enlace{background:none;border:0;padding:0;color:var(--accent-strong);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 
 /* Formularios */
 label{display:block;font-weight:700;font-size:.88rem;margin-bottom:4px}
@@ -44,9 +43,6 @@ input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--a
 .hero{background:var(--grad-hero);border:1px solid var(--line);border-radius:var(--r-card);padding:clamp(22px,4vw,36px)}
 .hero h1{margin:8px 0 10px}
 .hero .meta{color:var(--ink-2);margin:0 0 12px}
-.aviso{color:var(--warn);margin:0}
-.tres{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
-.numero{font:800 1.6rem/1 var(--f-body);color:var(--accent);margin:4px 0 2px}
 .estado{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px}
 .estado::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
 .estado.ok{color:var(--ok)}
@@ -60,14 +56,10 @@ input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--a
   border-radius:var(--r-item);padding:12px 12px 12px 14px;min-width:0}
 .item b{display:block;font-weight:700}
 .item .muted{font-size:.92rem}
-.item.pasado b{color:var(--muted)}
-.item.hoy{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 .pill{display:inline-block;font:700 .68rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;
   background:var(--accent-soft);color:var(--accent);vertical-align:2px;margin-left:6px}
 .pill.gris{background:var(--line);color:var(--muted)}
 .pill.verde{background:var(--ok-soft);color:var(--ok)}
-.agenda .cuando{font:700 .78rem var(--f-body);color:var(--accent-strong);text-transform:uppercase;letter-spacing:.06em;min-width:92px}
-.agenda .item{justify-content:flex-start}
 
 /* Encabezado + pestañas */
 .cabecera{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
@@ -104,9 +96,7 @@ input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--a
 @media (max-width:560px){
   .pestanas{gap:2px}
   .pestanas button{flex:1 1 0;min-width:0;padding:0 4px;font-size:.8rem}
-  .agenda .item{flex-direction:column;align-items:flex-start;gap:2px}
-  .agenda .cuando{min-width:0}
-  .tarjeta{padding:18px}
+      .tarjeta{padding:18px}
   .pestanas .largo{display:none}
   .pestanas .corto{display:inline}
 }

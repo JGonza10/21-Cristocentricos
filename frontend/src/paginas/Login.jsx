@@ -33,7 +33,7 @@ export default function Login({ alEntrar }) {
         <div className="sello" aria-hidden="true">†</div>
         <div className="etiqueta">Sistema del equipo</div>
         <h1 style={{ marginTop: 6 }}>Cristocéntricos</h1>
-        <p className="muted" style={{ marginTop: 8 }}>Entra para revisar y aprobar lo que preparan los agentes.</p>
+        <p className="muted" style={{ marginTop: 8 }}>Entra para preparar los eventos del equipo.</p>
 
         <form className="tarjeta" onSubmit={entrar} noValidate>
           <div className="campo">

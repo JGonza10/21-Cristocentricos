@@ -40,7 +40,7 @@ def test_sirve_frontend_compilado(tmp_path):
                       "FRONTEND_DIST": dist, "LOG_DIR": tmp_path / "logs"})
     c = app.test_client()
     assert "hola" in c.get("/").get_data(as_text=True)
-    assert "hola" in c.get("/bandeja").get_data(as_text=True)  # rutas de React
+    assert "hola" in c.get("/calendario").get_data(as_text=True)  # rutas de React
 
 
 def test_sin_secret_key_no_arranca(monkeypatch):

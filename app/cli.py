@@ -1,9 +1,12 @@
-"""Comandos de consola: flask --app app crear-usuario / cambiar-password."""
+"""Comandos de consola: flask --app app crear-usuario / cambiar-password / limpiar-datos."""
+import shutil
+from pathlib import Path
+
 import click
 from flask import current_app
 
 from .extensiones import db
-from .modelos import Usuario
+from .modelos import Evento, Integrante, IntentoLogin, Usuario, evento_integrantes
 from .seguridad import hashear, normalizar_usuario, problema_password
 
 
@@ -45,3 +48,21 @@ def registrar(app):
         u.hash_password = hashear(_pedir_password())
         db.session.commit()
         click.echo("Contraseña actualizada.")
+
+    @app.cli.command("limpiar-datos")
+    @click.option("--con-usuarios", is_flag=True, help="También borra las cuentas (luego hay que crearlas otra vez).")
+    @click.confirmation_option(prompt="Se borrarán eventos, equipo e imágenes. ¿Continuar?")
+    def limpiar_datos(con_usuarios):
+        """Deja la base de datos en blanco para empezar de cero."""
+        db.session.execute(evento_integrantes.delete())
+        Evento.query.delete()
+        Integrante.query.delete()
+        IntentoLogin.query.delete()
+        if con_usuarios:
+            Usuario.query.delete()
+        db.session.commit()
+        paquetes = Path(current_app.config["PAQUETES_DIR"])
+        if paquetes.exists():
+            shutil.rmtree(paquetes)
+        cuentas = "y cuentas " if con_usuarios else ""
+        click.echo(f"Listo: eventos, equipo, imágenes {cuentas}borrados.")
