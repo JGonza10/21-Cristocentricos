@@ -2,6 +2,7 @@ import Turnos from '../componentes/Turnos.jsx'
 import TemaEvento from '../componentes/TemaEvento.jsx'
 import Revision from '../componentes/Revision.jsx'
 import { ControlObs } from '../componentes/Grabacion.jsx'
+import { VERSION_CORTA } from '../version.js'
 import { infoEvento, proximoEvento } from '../evento.js'
 import { fechaDeClave } from '../util.js'
 
@@ -25,10 +26,10 @@ export default function Evento({ fecha, ir }) {
         <section className="tarjeta">
           <h2>El día del evento</h2>
           <Revision key={r.clave} fecha={r.clave} />
-          <ControlObs />
+          {!VERSION_CORTA && <ControlObs />}
         </section>
       )}
-      <Turnos clave={r.clave} yaPaso={yaPaso} ir={ir} />
+      {!VERSION_CORTA && <Turnos clave={r.clave} yaPaso={yaPaso} ir={ir} />}
     </>
   )
 }

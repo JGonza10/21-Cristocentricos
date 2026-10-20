@@ -62,6 +62,7 @@ def test_cita_del_tema(app):
 
 def test_difusion_completa_con_reel_promocional(app):
     _tema(app, LUNES)
+    app.config["REEL_PROMO"] = True              # en la versión corta va apagado
     with app.app_context():
         nuevos = carrusel.preparar_difusion(LUNES)
         assert [p.tipo for p in nuevos] == ["carrusel", "reel"]
@@ -103,7 +104,7 @@ def test_tarea_arma_la_difusion_solo_con_tema(app, monkeypatch, sin_video):
     monkeypatch.setattr(fechas, "ahora_cdmx", lambda: ahora["t"])
     with app.app_context():
         nuevos = carrusel.tarea()          # el lunes 19 no tiene tema; el 6 de nov aún está lejos
-        assert [(p.fecha_evento, p.tipo) for p in nuevos] == [(VIERNES, "carrusel"), (VIERNES, "reel")]
+        assert [(p.fecha_evento, p.tipo) for p in nuevos] == [(VIERNES, "carrusel")]   # solo las 5 imágenes
         assert carrusel.tarea() == []      # no se repite
         ahora["t"] = datetime(2026, 10, 24, 7, 5, tzinfo=fechas.CDMX)
         assert {p.fecha_evento for p in carrusel.tarea()} == {date(2026, 11, 6)}   # ya entra en las 2 semanas

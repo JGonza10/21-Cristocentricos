@@ -188,6 +188,7 @@ def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
         g = Grabacion(nombre=video.name, fecha_evento=date(2026, 10, 19), tamano=video.stat().st_size)
         db.session.add(g)
         db.session.commit()
+        app.config["CARRUSEL_ESCENAS"] = True     # apagado en la versión corta; aquí se prueba que sigue sirviendo
         nuevos = reels.procesar(g)
         assert [x.tipo for x in nuevos] == ["reel", "carrusel"]          # 1 reel + carrusel de escenas
         p = nuevos[0]

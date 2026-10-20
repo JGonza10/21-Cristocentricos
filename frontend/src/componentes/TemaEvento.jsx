@@ -1,7 +1,7 @@
 // Tema, guion e intenciones de un evento. Se llena desde el calendario (con anticipación) o desde Inicio.
 // «Preparar guion con Claude» copia las instrucciones y abre Claude para pegarlas (sin API de pago).
 import { useEffect, useState } from 'react'
-import { api } from '../api.js'
+import { api, enviarCrudo } from '../api.js'
 import { fechaHora } from '../util.js'
 
 const VACIO = { titulo: '', descripcion: '', cita: '', intenciones: '', guion: '', notas: '' }
@@ -12,6 +12,8 @@ export default function TemaEvento({ fecha, alGuardar }) {
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
+  const [imagen, setImagen] = useState(false)
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     setTema(undefined)
@@ -19,6 +21,7 @@ export default function TemaEvento({ fecha, alGuardar }) {
     setAviso('')
     api(`/api/temas/${fecha}`).then((d) => {
       setTema(d.tema)
+      setImagen(!!d.imagen)
       setForm(d.tema ? Object.fromEntries(Object.keys(VACIO).map((k) => [k, d.tema[k] ?? ''])) : VACIO)
     }).catch((e) => setError(e.message))
   }, [fecha])
@@ -33,7 +36,8 @@ export default function TemaEvento({ fecha, alGuardar }) {
     try {
       const d = await api(`/api/temas/${fecha}`, { metodo: 'PUT', datos: form })
       setTema(d.tema)
-      setAviso(d.tema.aviso_pendiente ? 'Tema guardado. El equipo recibirá el aviso por correo y en su calendario.' : 'Cambios guardados.')
+      setAviso([d.tema.aviso_pendiente ? 'Tema guardado. El equipo recibirá el aviso.' : 'Cambios guardados.',
+        d.difusion ? 'Las 5 imágenes de difusión ya están en Material.' : ''].filter(Boolean).join(' '))
       alGuardar?.(d.tema)
     } catch (err) {
       setError(err.message)
@@ -56,12 +60,44 @@ export default function TemaEvento({ fecha, alGuardar }) {
     }
   }
 
+  async function subirImagen(e) {
+    const archivo = e.target.files?.[0]
+    e.target.value = ''
+    if (!archivo) return
+    setOcupado(true)
+    setError('')
+    try {
+      const r = await enviarCrudo(`/api/temas/${fecha}/imagen`, archivo, { 'Content-Type': archivo.type || 'application/octet-stream' })
+      if (!r.ok) throw new Error(r.cuerpo.error || (r.status === 413 ? 'La imagen pesa más de 15 MB.' : 'No se pudo subir la imagen.'))
+      setImagen(true)
+      setVersion((v) => v + 1)
+      setAviso('Imagen del tema guardada: saldrá en los reels de este evento.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function quitarImagen() {
+    setOcupado(true)
+    setError('')
+    try {
+      await api(`/api/temas/${fecha}/imagen`, { metodo: 'DELETE' })
+      setImagen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   async function difusion(otra = false) {
     setOcupado(true)
     setError('')
     try {
       const d = await api(`/api/temas/${fecha}/difusion`, { metodo: 'POST', datos: { otra } })
-      setAviso(d.creados ? `Listo: ${d.creados} piezas de difusión en la bandeja (pestaña Contenido).`
+      setAviso(d.creados ? 'Listo: las 5 imágenes de difusión están en Material.'
         : 'La difusión de este evento ya existe. Usa «Hacer otra versión» si cambiaste el tema.')
       alGuardar?.(tema)
     } catch (err) {
@@ -88,12 +124,20 @@ export default function TemaEvento({ fecha, alGuardar }) {
         <input id={`cita-${fecha}`} maxLength={200} placeholder="Ej. Perdona y serás perdonado (Lc 6,37)" {...campo('cita')} />
       </div>
       <div className="campo">
+        <label htmlFor={`img-${fecha}`}>Imagen del tema (va al centro de los reels, p. ej. el Santo Rostro)</label>
+        {imagen && <img className="tema-imagen" src={`/api/temas/${fecha}/imagen?v=${version}`} alt="Imagen del tema" />}
+        <div className="botones">
+          <input id={`img-${fecha}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={ocupado} onChange={subirImagen} />
+          {imagen && <button className="enlace" type="button" disabled={ocupado} onClick={quitarImagen}>Quitar imagen</button>}
+        </div>
+      </div>
+      <div className="campo">
         <label htmlFor={`int-${fecha}`}>Intenciones recibidas</label>
         <textarea id={`int-${fecha}`} rows={3} maxLength={4000} placeholder="Una por renglón. Sin apellidos si no hay permiso." {...campo('intenciones')} />
       </div>
       <div className="campo">
         <label htmlFor={`guion-${fecha}`}>Guion</label>
-        <textarea id={`guion-${fecha}`} rows={8} maxLength={20000} placeholder="Escríbelo aquí o pídele ayuda a Claude con el botón de abajo." {...campo('guion')} />
+        <textarea id={`guion-${fecha}`} rows={8} maxLength={20000} placeholder="Pégalo aquí si ya lo tienes. Si no hay guion, «Preparar guion con Claude» busca el tema en fuentes de la Iglesia." {...campo('guion')} />
       </div>
       <div className="campo">
         <label htmlFor={`notas-${fecha}`}>Notas del equipo</label>
@@ -105,8 +149,7 @@ export default function TemaEvento({ fecha, alGuardar }) {
       <div className="botones">
         <button className="btn chico" type="submit" disabled={ocupado || !cambiado}>Guardar tema</button>
         <button className="btn suave chico" type="button" disabled={ocupado || !form.titulo.trim()} onClick={prepararConClaude}>Preparar guion con Claude</button>
-        {tema && <button className="btn suave chico" type="button" disabled={ocupado} onClick={() => difusion(false)}>Generar difusión ahora</button>}
-        {tema && <button className="enlace" type="button" disabled={ocupado} onClick={() => difusion(true)}>Hacer otra versión</button>}
+        {tema && <button className="enlace" type="button" disabled={ocupado} onClick={() => difusion(true)}>Otra versión de las 5 imágenes</button>}
       </div>
       {tema && <p className="chico-texto">Guardado por {tema.actualizado_por ?? 'alguien del equipo'} el {fechaHora(tema.actualizado).replace(/\.$/, '')}.</p>}
     </form>

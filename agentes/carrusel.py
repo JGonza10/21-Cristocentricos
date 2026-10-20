@@ -320,7 +320,7 @@ def _existentes(f: date, tipo: str, cual: str) -> list[Paquete]:
 
 
 def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
-    """Carrusel y reel promocional del evento, a la bandeja. Sin `forzar`, no repite lo que ya existe."""
+    """Las 5 imágenes de difusión (y el reel promocional si REEL_PROMO=1). Sin `forzar`, no repite lo que ya existe."""
     if not fechas.es_dia_de_evento(f):
         raise ValueError(f"{f} no es lunes ni viernes.")
     nuevos = []
@@ -331,7 +331,7 @@ def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
         nuevos.append(crear_paquete("carrusel", f, f"Difusión · {_titulo(f)}"[:120], texto_difusion(f),
                                     carpeta=rel, archivos=archivos, datos={"momento": "antes"}))
     previos = _existentes(f, "reel", "antes")
-    if forzar or not previos:
+    if current_app.config.get("REEL_PROMO", False) and (forzar or not previos):
         rel = f"{f.isoformat()}/promo" + (f"-{len(previos) + 1}" if previos else "")
         _reel_promocional(f, Path(current_app.config["PAQUETES_DIR"]) / rel)
         nuevos.append(crear_paquete("reel", f, f"Reel de difusión · {_titulo(f)}"[:120], texto_difusion(f),

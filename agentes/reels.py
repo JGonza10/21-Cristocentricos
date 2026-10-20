@@ -4,9 +4,10 @@ Cuando llega una grabación a grabaciones/:
   1. faster-whisper la transcribe (con marcas de tiempo por segmento).
   2. Se buscan frases clave y se arman candidatos de 30 a 55 s (reglas de CLAUDE.md §2.1).
   3. Se eligen 5 momentos sin traslape, repartidos en el evento.
-  4. ffmpeg los pasa a vertical 9:16 con subtítulos y el nombre del canal.
-  5. Cada reel entra a la bandeja como pendiente.
-  6. Con esos momentos se arma el carrusel de escenas (agentes/carrusel.py).
+  4. Cada reel se edita con el estilo del cliente (servicios/estilo.py + estilo_cliente/estilo.json):
+     mejora de luz, enfoque y audio, capas, textos y subtítulos. Sin estilo.json, el look de la v1.0.
+  5. Cada reel queda en Material (pestaña Contenido).
+  6. Solo si CARRUSEL_ESCENAS=1: carrusel de escenas (agentes/carrusel.py).
 """
 import re
 import textwrap
@@ -18,7 +19,7 @@ from flask import current_app
 from app.bandeja import actualizar_por_agente, crear_paquete
 from app.extensiones import db
 from app.modelos import Grabacion, Paquete, ahora
-from servicios import ffmpeg, whisper
+from servicios import estilo, ffmpeg, whisper
 
 from . import fechas
 
@@ -60,7 +61,8 @@ def _silencio_en(silencios, a: float, b: float) -> float:
     return sum(max(0.0, min(b, s1) - max(a, s0)) for s0, s1 in silencios)
 
 
-def candidatos(segmentos: list, silencios: list, duracion: float) -> list[dict]:
+def candidatos(segmentos: list, silencios: list, duracion: float, minimo: float = DURACION_MIN,
+               maximo: float = DURACION_MAX, ideal: float = DURACION_IDEAL) -> list[dict]:
     """Ventanas de 30–55 s que empiezan al inicio de una frase y terminan al final de otra.
 
     Puntaje = cada tipo de frase clave cuenta una vez (así no gana solo la ventana con más
@@ -79,13 +81,13 @@ def candidatos(segmentos: list, silencios: list, duracion: float) -> list[dict]:
                 tipos.add(info[j][0])
                 ordinal = ordinal or info[j][2]
             largo = segmentos[j][1] - seg[0]
-            if largo > DURACION_MAX:
+            if largo > maximo:
                 break
-            if largo < DURACION_MIN:
+            if largo < minimo:
                 continue
             puntaje = sum(pesos[t] for t in tipos) + info[i][1] * 1.5
             puntaje -= 4.0 * _silencio_en(silencios, seg[0], segmentos[j][1]) / largo
-            puntaje -= abs(largo - DURACION_IDEAL) / 50.0
+            puntaje -= abs(largo - ideal) / 50.0
             if mejor is None or puntaje > mejor["puntaje"]:
                 principal = max(tipos, key=lambda t: pesos[t]) if tipos else None
                 mejor = {"inicio": seg[0], "fin": segmentos[j][1], "puntaje": round(puntaje, 3),
@@ -95,9 +97,11 @@ def candidatos(segmentos: list, silencios: list, duracion: float) -> list[dict]:
     return salida
 
 
-def elegir_momentos(segmentos: list, silencios: list, duracion: float, cuantos: int = CUANTOS) -> list[dict]:
-    """Los `cuantos` mejores momentos, sin traslape y repartidos (uno por tercio si se puede)."""
-    cands = sorted(candidatos(segmentos, silencios, duracion), key=lambda c: -c["puntaje"])
+def elegir_momentos(segmentos: list, silencios: list, duracion: float, cuantos: int = CUANTOS,
+                    minimo: float = DURACION_MIN, maximo: float = DURACION_MAX,
+                    ideal: float = DURACION_IDEAL) -> list[dict]:
+    """Los `cuantos` mejores momentos, sin traslape y repartidos (uno por cada parte del evento)."""
+    cands = sorted(candidatos(segmentos, silencios, duracion, minimo, maximo, ideal), key=lambda c: -c["puntaje"])
     parte = max(duracion, 1.0) / cuantos
     elegidos: list[dict] = []
 
@@ -170,8 +174,28 @@ def _dir_grabaciones() -> Path:
     return d
 
 
+def _estilo() -> dict | None:
+    """La receta del cliente (estilo_cliente/estilo.json) si está activa; None = estilo de la v1.0."""
+    raiz = Path(current_app.config["ESTILO_DIR"])
+    if not (raiz / "estilo.json").exists():
+        return None
+    receta = estilo.cargar(raiz)
+    return receta if receta.get("activo", True) else None
+
+
 def _render(grab: Grabacion, inicio: float, fin: float, carpeta_rel: str) -> None:
     salida = Path(current_app.config["PAQUETES_DIR"]) / carpeta_rel / "reel.mp4"
+    receta = _estilo()
+    if receta:
+        from app.temas import titulo_de
+        frase = " ".join(s[2] for s in (grab.segmentos or []) if s[1] > inicio and s[0] < fin)
+        valores = {"tema": titulo_de(grab.fecha_evento) or "", "fecha": fechas.nombre_fecha(grab.fecha_evento),
+                   "fecha_iso": grab.fecha_evento.isoformat(),
+                   "canal": current_app.config["CANAL_NOMBRE"], "frase": textwrap.shorten(frase, 90, placeholder="…")}
+        estilo.editar_reel(str(_dir_grabaciones() / grab.nombre), inicio, fin, salida,
+                           Path(current_app.config["ESTILO_DIR"]), Path(current_app.config["FUENTES_DIR"]),
+                           grab.segmentos or [], valores, receta)
+        return
     ffmpeg.cortar_vertical(
         str(_dir_grabaciones() / grab.nombre), inicio, fin, srt_para(grab.segmentos or [], inicio, fin),
         current_app.config["CANAL_NOMBRE"], Path(current_app.config["FUENTES_DIR"]) / "PublicSans_700Bold.ttf",
@@ -179,7 +203,7 @@ def _render(grab: Grabacion, inicio: float, fin: float, carpeta_rel: str) -> Non
 
 
 def procesar(grab: Grabacion) -> list[Paquete]:
-    """Transcribe una grabación, elige 3 momentos, genera los reels y los manda a la bandeja."""
+    """Transcribe una grabación, elige 5 momentos, edita los reels y los deja en Material."""
     ruta = _dir_grabaciones() / grab.nombre
     grab.estado, grab.error, grab.actualizado = "procesando", None, ahora()
     db.session.commit()
@@ -190,7 +214,11 @@ def procesar(grab: Grabacion) -> list[Paquete]:
             current_app.logger.info("Transcribiendo %s (puede tardar varios minutos)", grab.nombre)
             grab.segmentos = whisper.transcribir(str(ruta), current_app.config["WHISPER_MODELO"])
             db.session.commit()
-        momentos = elegir_momentos(grab.segmentos, ffmpeg.silencios(str(ruta)), grab.duracion)
+        receta = _estilo()
+        largo = (receta or {}).get("duracion") or {}
+        momentos = elegir_momentos(grab.segmentos, ffmpeg.silencios(str(ruta)), grab.duracion, CUANTOS,
+                                   float(largo.get("min", DURACION_MIN)), float(largo.get("max", DURACION_MAX)),
+                                   float(largo.get("ideal", DURACION_IDEAL)))
         if not momentos:
             raise ValueError("sin momentos")
         nuevos = []
@@ -208,14 +236,8 @@ def procesar(grab: Grabacion) -> list[Paquete]:
                 texto_reel(grab.fecha_evento, m, grab.segmentos), carpeta=carpeta_rel, archivos=["reel.mp4"],
                 datos={"grabacion_id": grab.id, "inicio": m["inicio"], "fin": m["fin"],
                        "duracion_fuente": grab.duracion, "tipo": m["tipo"], "momento": "despues"}))
-        try:   # el carrusel de escenas es extra: si falla, los reels igual quedan
-            from .carrusel import carrusel_de_escenas
-            p = carrusel_de_escenas(grab.fecha_evento, ruta, momentos, grab.segmentos)
-            if p:
-                nuevos.append(p)
-        except Exception:  # noqa: BLE001
-            db.session.rollback()
-            current_app.logger.exception("No se pudo armar el carrusel de escenas de %s", grab.nombre)
+        if current_app.config.get("CARRUSEL_ESCENAS", False):
+            nuevos += _escenas(grab, ruta, momentos)
             grab = db.session.get(Grabacion, grab.id)
         grab.estado = "lista"
     except Exception as e:  # noqa: BLE001 — cualquier fallo queda registrado y visible
@@ -223,13 +245,28 @@ def procesar(grab: Grabacion) -> list[Paquete]:
         current_app.logger.exception("Falló el procesamiento de %s", grab.nombre)
         grab = db.session.get(Grabacion, grab.id)
         grab.estado = "error"
-        grab.error = ("No encontramos momentos de 30 a 55 segundos con voz en esta grabación."
-                      if isinstance(e, ValueError) and str(e) == "sin momentos"
-                      else "No se pudo procesar la grabación. Revisa datos/logs/worker.log.")
+        if isinstance(e, ValueError) and str(e) == "sin momentos":
+            grab.error = "No encontramos momentos con voz del largo pedido en esta grabación."
+        elif isinstance(e, estilo.ErrorEstilo):
+            grab.error = f"Estilo del cliente: {e}"[:300]
+        else:
+            grab.error = "No se pudo procesar la grabación. Revisa datos/logs/worker.log."
         nuevos = []
     grab.actualizado = ahora()
     db.session.commit()
     return nuevos
+
+
+def _escenas(grab: Grabacion, ruta: Path, momentos: list) -> list[Paquete]:
+    """Carrusel con escenas del video (v1.0). En la versión corta va apagado (CARRUSEL_ESCENAS=0)."""
+    try:   # el carrusel de escenas es extra: si falla, los reels igual quedan
+        from .carrusel import carrusel_de_escenas
+        p = carrusel_de_escenas(grab.fecha_evento, ruta, momentos, grab.segmentos)
+        return [p] if p else []
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception("No se pudo armar el carrusel de escenas de %s", grab.nombre)
+        return []
 
 
 def revisar_carpeta() -> list[Paquete]:

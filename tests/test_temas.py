@@ -78,7 +78,7 @@ def test_instrucciones_para_claude(cliente):
                                               "guion": "Borrador viejo"}, metodo="put")
     texto = cliente.get(f"/api/temas/{VIERNES}/instrucciones").get_json()["texto"]
     assert "Tema: El perdón" in texto and "Viernes 23 de octubre" in texto
-    assert "Por la salud de Doña Mary" in texto and "Borrador viejo" in texto and "3 frases cortas" in texto
+    assert "Por la salud de Doña Mary" in texto and "Borrador viejo" in texto and "5 frases cortas" in texto
 
 
 def test_ideas_escritas_y_usarlas_como_tema(app, cliente):
@@ -221,10 +221,18 @@ def test_generar_difusion_desde_la_app(app, cliente, monkeypatch):
                         lambda f, c: (c.mkdir(parents=True, exist_ok=True), (c / "promo.mp4").write_bytes(b"0")))
     login(cliente)
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").status_code == 409
-    enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "El perdón"}, metodo="put")
-    assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").get_json()["creados"] == 2
+    # Versión corta: al guardar el tema salen solas las 5 imágenes (sin reel promocional)
+    r = enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "El perdón"}, metodo="put")
+    assert r.get_json()["difusion"] == 1
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").get_json()["creados"] == 0
-    assert enviar(cliente, f"/api/temas/{VIERNES}/difusion", {"otra": True}).get_json()["creados"] == 2
+    assert enviar(cliente, f"/api/temas/{VIERNES}/difusion", {"otra": True}).get_json()["creados"] == 1
+    # Guardar sin cambiar el título no repite; cambiarlo hace una versión nueva
+    assert enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "El perdón", "guion": "x"}, metodo="put").get_json()["difusion"] == 0
+    assert enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "El perdón en familia"}, metodo="put").get_json()["difusion"] == 1
+    with app.app_context():
+        from app.modelos import Paquete
+        assert Paquete.query.filter_by(tipo="reel").count() == 0
+        assert Paquete.query.filter_by(tipo="carrusel").count() == 3
 
 
 def test_estadisticas_por_periodo(app, cliente):
@@ -241,9 +249,9 @@ def test_estadisticas_por_periodo(app, cliente):
     assert "2026-10-02" not in fechas_ev and "2026-10-16" in fechas_ev        # pasado sin actividad no cuenta
     assert fechas_ev[-1] == "2026-10-30" and d["resumen"]["eventos"] == 1
     viernes = next(e for e in d["eventos"] if e["fecha"] == "2026-10-16")
-    assert viernes["minutos"] == 60 and viernes["total"] == 13
+    assert viernes["minutos"] == 60 and viernes["total"] == 7
     assert d["seguidores"]["instagram"] == [{"fecha": "2026-10-10", "cantidad": 120}]
-    assert len(d["pasos"]) == 13 and set(d["piezas"]) == {"pendiente", "aprobado", "rechazado"}
+    assert len(d["pasos"]) == 7 and set(d["piezas"]) == {"pendiente", "aprobado", "rechazado"}
     assert cliente.get("/api/estadisticas?desde=2026-10-31&hasta=2026-10-01").status_code == 400
     assert cliente.get("/api/estadisticas?desde=2020-01-01&hasta=2026-10-01").status_code == 400
     assert cliente.get("/api/estadisticas?desde=nada").status_code == 400

@@ -1,0 +1,117 @@
+{
+  "activo": true,
+  "nota": "Receta armada el 2026-10-19 a partir de referencia/Cristocentricos_V0001.mp4 (edición del cliente del video V0007). Medidas pasadas de 576x1024 a 1080x1920. Música del cierre sacada de la referencia (segundo 51.03 al final). Cortes con cuadros intermedios (morph).",
+  "formato": {
+    "ancho": 1080,
+    "alto": 1920,
+    "fps": 30,
+    "encuadre": "llenar",
+    "foco_y": 0.3
+  },
+  "duracion": {
+    "min": 35,
+    "max": 62,
+    "ideal": 56
+  },
+  "quitar_pausas": {
+    "activo": true,
+    "minimo": 0.6,
+    "margen": 0.15,
+    "ruido_db": -35
+  },
+  "mejora": {
+    "luz": true,
+    "contraste": 1.04,
+    "saturacion": 1.05,
+    "gamma": 1.0,
+    "nitidez": 0.5,
+    "quitar_grano": true,
+    "quitar_ruido": true,
+    "volumen_lufs": -16
+  },
+  "intro": null,
+  "cierre": {
+    "archivo": "Cristocentricos_Virgen_de_Fatima_caminando_v9.MP4",
+    "segundos": 4.6,
+    "audio": "musica_cierre_virgen.m4a",
+    "ganancia_db": 11
+  },
+  "negro_final": 0.4,
+  "fundido": 0,
+  "capas": [
+    {
+      "archivo": "temas/{fecha_iso}",
+      "opcional": true,
+      "x": 249,
+      "y": 831,
+      "ancho": 582,
+      "alto": 866,
+      "ajuste": "cubrir",
+      "desde": 0,
+      "hasta": null,
+      "fundido": 0
+    },
+    {
+      "archivo": "IMG_4620.PNG",
+      "x": 675,
+      "y": 92,
+      "ancho": 313,
+      "desde": 0,
+      "hasta": null,
+      "fundido": 0.9
+    }
+  ],
+  "textos": [
+    {
+      "texto": "{tema}",
+      "fuente": "Fraunces_800ExtraBold.ttf",
+      "tamano": 79,
+      "color": "#FFF4C9",
+      "fondo": null,
+      "sombra": true,
+      "color_sombra": "#000000C8",
+      "difuminado_sombra": 6,
+      "x": "centro",
+      "y": 1500,
+      "ancla": "arriba",
+      "interlineado": 1.1,
+      "ancho_max": 1000,
+      "relleno": [
+        0,
+        0
+      ],
+      "desde": 0,
+      "hasta": 5.6,
+      "efecto": "maquina",
+      "letras_por_segundo": 15,
+      "corte": "abajo_largo"
+    }
+  ],
+  "subtitulos": {
+    "activo": true,
+    "fuente": "OpenSans_600SemiBold.ttf",
+    "tamano": 72,
+    "color": "#FFFBE3",
+    "fondo": null,
+    "sombra": true,
+    "color_sombra": "#000000B4",
+    "difuminado_sombra": 5,
+    "y": 1595,
+    "ancla": "arriba",
+    "interlineado": 1.37,
+    "relleno": [
+      0,
+      0
+    ],
+    "ancho_max": 1000,
+    "caracteres_por_renglon": 24,
+    "renglones": 2,
+    "max_palabras": 8,
+    "efecto": "palabras"
+  },
+  "musica": null,
+  "transiciones": {
+    "tipo": "morph",
+    "duracion": 0.27
+  }
+}

@@ -6,6 +6,7 @@ import { ahoraCDMX, claveFecha, esDiaDeEvento, fechaCorta, infoEvento, proximoEv
 import { fechaDeClave } from '../util.js'
 import TemaEvento from './TemaEvento.jsx'
 import Turnos from './Turnos.jsx'
+import { VERSION_CORTA } from '../version.js'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -82,7 +83,7 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
   const yaPaso = info && (info.estado === 'pasado' || info.estado === 'hoy-terminado')
 
   return (
-    <div className="cal-ventana">
+    <div className={`cal-ventana ${VERSION_CORTA ? 'solo' : ''}`}>
       <div className="cal-principal">
         <div className="cal-cabeza">
           <div className="cal-nav">
@@ -106,15 +107,16 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
             const tema = temas[clave]?.titulo
             const i = infoEvento(d)
             const pasado = i.estado === 'pasado' || i.estado === 'hoy-terminado'
-            const tono = pasado ? 'pasado' : t?.dirige ? 'asignado' : 'hueco'
+            const tono = pasado ? 'pasado' : (VERSION_CORTA ? tema : t?.dirige) ? 'asignado' : 'hueco'
             return (
               <button key={clave} role="gridcell" aria-selected={elegido === clave}
                 className={`cal-celda evento ${tono} ${fuera ? 'fuera' : ''} ${esHoy ? 'hoy' : ''}`}
                 onClick={() => { setElegido(clave); setAviso('') }}
-                aria-label={`${i.nombre}: ${tema ? `tema ${tema}, ` : 'sin tema, '}${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}${t?.apoyan.length ? `, apoya ${t.apoyan.map((x) => x.nombre).join(', ')}` : ''}`}>
+                aria-label={VERSION_CORTA ? `${i.nombre}: ${tema ? `tema ${tema}` : 'sin tema'}`
+                  : `${i.nombre}: ${tema ? `tema ${tema}, ` : 'sin tema, '}${t?.dirige ? `dirige ${t.dirige.nombre}` : 'sin asignar'}${t?.apoyan.length ? `, apoya ${t.apoyan.map((x) => x.nombre).join(', ')}` : ''}`}>
                 <span className="cal-num">{d.getUTCDate()}</span>
                 <span className={`cal-tema ${tema ? '' : 'falta'}`}>{tema ?? (pasado ? '' : 'Sin tema')}</span>
-                {t ? (
+                {VERSION_CORTA ? null : t ? (
                   <>
                     <span className="cal-quien">{primerNombre(t.dirige) ?? (pasado ? '' : 'Sin asignar')}</span>
                     {t.apoyan.length > 0 && <span className="cal-apoya">+ {t.apoyan.map(primerNombre).join(', ')}</span>}
@@ -126,11 +128,11 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
         </div>
 
         <div className="cal-pie">
-          <span className="cal-leyenda"><i className="asignado" />Asignado</span>
-          <span className="cal-leyenda"><i className="hueco" />Sin asignar</span>
+          <span className="cal-leyenda"><i className="asignado" />{VERSION_CORTA ? 'Con tema' : 'Asignado'}</span>
+          <span className="cal-leyenda"><i className="hueco" />{VERSION_CORTA ? 'Falta tema' : 'Sin asignar'}</span>
           <span className="cal-leyenda"><i className="pasado" />Ya pasó</span>
-          <span className="cal-leyenda"><i className="sin-tema" />Sin tema</span>
-          <button className="btn suave chico" onClick={repartir} disabled={ocupado}>Llenar huecos automáticamente</button>
+          {!VERSION_CORTA && <span className="cal-leyenda"><i className="sin-tema" />Sin tema</span>}
+          {!VERSION_CORTA && <button className="btn suave chico" onClick={repartir} disabled={ocupado}>Llenar huecos automáticamente</button>}
         </div>
         {aviso && <p className="chico-texto" role="status">{aviso}</p>}
         {error && <p className="error" role="alert">{error}</p>}
@@ -140,13 +142,15 @@ export default function CalendarioEventos({ ir, alCambiar, fechaInicial }) {
             <h3>{info.nombre} <span className="muted">· {info.faltan}</span></h3>
             <TemaEvento key={`tema-${elegido}`} fecha={elegido}
               alGuardar={(t) => { if (t) setTemas((x) => ({ ...x, [elegido]: t })); alCambiar?.() }} />
-            <h3 className="cal-sub">Quién dirige y quién apoya</h3>
-            <Turnos key={elegido} clave={elegido} yaPaso={yaPaso} ir={ir} alGuardar={(c, t) => { guardado(c, t); setVersion((v) => v + 1) }} />
+            {!VERSION_CORTA && <>
+              <h3 className="cal-sub">Quién dirige y quién apoya</h3>
+              <Turnos key={elegido} clave={elegido} yaPaso={yaPaso} ir={ir} alGuardar={(c, t) => { guardado(c, t); setVersion((v) => v + 1) }} />
+            </>}
           </div>
         )}
       </div>
 
-      <EquipoDelMes turnos={turnos} mes={mes} version={version} alCambiar={() => { setVersion((v) => v + 1); alCambiar?.() }} />
+      {!VERSION_CORTA && <EquipoDelMes turnos={turnos} mes={mes} version={version} alCambiar={() => { setVersion((v) => v + 1); alCambiar?.() }} />}
     </div>
   )
 }

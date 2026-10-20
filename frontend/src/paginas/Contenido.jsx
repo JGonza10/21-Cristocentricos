@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { nombreFecha } from '../evento.js'
 import { REDES, fechaDeClave, fechaHora, segundosATexto } from '../util.js'
+import { VERSION_CORTA } from '../version.js'
 
 const FILTROS = [
   { id: 'pendiente', nombre: 'Pendientes' },
@@ -9,7 +10,9 @@ const FILTROS = [
   { id: 'rechazado', nombre: 'Rechazados' },
 ]
 const VACIO = {
-  pendiente: 'No hay paquetes por revisar. Aquí aparecen los carruseles (2 días antes de cada evento) y los reels (cuando llega la grabación).',
+  pendiente: VERSION_CORTA
+    ? 'Todavía no hay material. Las 5 imágenes salen al guardar el tema y los 5 reels cuando llega el video del celular a grabaciones/.'
+    : 'No hay paquetes por revisar. Aquí aparecen los carruseles (2 días antes de cada evento) y los reels (cuando llega la grabación).',
   aprobado: 'Todavía no apruebas ningún paquete.',
   rechazado: 'No hay paquetes rechazados.',
 }
@@ -21,7 +24,7 @@ const ESTADO_PUB = {
   publicado: { texto: 'Publicado', clase: 'ok' },
   error: { texto: 'Con error', clase: 'warn' },
 }
-const ESTADO_GRAB = { nueva: 'En espera', procesando: 'Procesando…', lista: 'Reels listos', error: 'Con error' }
+const ESTADO_GRAB = { nueva: 'En espera', procesando: 'Editando…', lista: 'Reels listos', error: 'Con error' }
 const REFRESCO_MS = 30_000
 
 export default function Contenido() {
@@ -56,17 +59,19 @@ export default function Contenido() {
   return (
     <>
       <section className="tarjeta">
-        <span className="etiqueta">Bandeja de aprobación</span>
-        <p className="chico-texto" style={{ marginBottom: 14 }}>
-          Nada se publica sin el visto bueno de alguno de los dos. Revisa, corrige el texto si hace falta y aprueba.
+        <span className="etiqueta">{VERSION_CORTA ? 'Material del evento' : 'Bandeja de aprobación'}</span>
+        <p className="chico-texto" style={{ marginBottom: VERSION_CORTA ? 0 : 14 }}>
+          {VERSION_CORTA
+            ? 'Aquí llegan las 5 imágenes de difusión y los 5 reels editados con el estilo del cliente. Revísalos, ajusta el texto si hace falta, descárgalos y súbelos a cada red.'
+            : 'Nada se publica sin el visto bueno de alguno de los dos. Revisa, corrige el texto si hace falta y aprueba.'}
         </p>
-        <div className="filtros" role="group" aria-label="Filtrar por estado">
+        {!VERSION_CORTA && <div className="filtros" role="group" aria-label="Filtrar por estado">
           {FILTROS.map((f) => (
             <button key={f.id} aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
               {f.nombre} <span className="cuenta">{conteos[f.id]}</span>
             </button>
           ))}
-        </div>
+        </div>}
       </section>
 
       {error && <p className="error" role="alert">{error}</p>}
@@ -195,7 +200,17 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
 
       {error && <p className="error" role="alert">{error}</p>}
 
-      <div className="botones">
+      {VERSION_CORTA && (
+        <div className="botones">
+          {modificado && <button className="btn" disabled={ocupado} onClick={() => hacer('guardar')}>Guardar texto</button>}
+          {p.archivos.map((a) => (
+            <a key={a} className="btn suave chico" download={`${p.fecha_evento}_${p.titulo.replace(/[^\wáéíóúñ ]+/gi, '').trim().replace(/ +/g, '_')}_${a}`}
+              href={`/api/bandeja/${p.id}/archivo/${encodeURIComponent(a)}?v=${p.version}`}>Descargar {a}</a>
+          ))}
+        </div>
+      )}
+
+      {!VERSION_CORTA && <div className="botones">
         {pendiente && !rechazando && <>
           <button className="btn" disabled={ocupado || !!p.datos.recortar} onClick={() => hacer('aprobar')}>
             {modificado ? 'Guardar y aprobar' : 'Aprobar'}
@@ -209,7 +224,7 @@ function TarjetaPaquete({ paquete: p, alCambiar }) {
         </>}
         {!pendiente && !p.publicaciones.some((x) => x.estado === 'publicado' || x.estado === 'subiendo') &&
           <button className="btn suave" disabled={ocupado} onClick={() => hacer('reabrir')}>Regresar a pendientes</button>}
-      </div>
+      </div>}
     </article>
   )
 }

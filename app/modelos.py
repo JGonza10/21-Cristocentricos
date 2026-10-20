@@ -238,9 +238,11 @@ class EstadoAgente(db.Model):
 
 # --- Avance guiado por evento, reporte semanal y seguidores ------------------------
 
-# Orden del proceso de cada evento (documento "Lo que necesito", Gonza 2026-10-17).
-PASOS_EVENTO = ("tema", "turnos", "difusion", "revision", "vivo", "grabacion", "reels", "carrusel",
-                "bandeja", "publicacion", "redes", "registro", "mides")
+# Versión corta (Gonza, 2026-10-19): 7 pasos por evento. El proceso completo de la v1.0 (13 pasos con
+# turnos, bandeja, publicación y reporte) queda en PASOS_COMPLETOS por si se reactiva.
+PASOS_EVENTO = ("tema", "guion", "difusion", "revision", "grabacion", "reels", "ideas")
+PASOS_COMPLETOS = ("tema", "turnos", "difusion", "revision", "vivo", "grabacion", "reels", "carrusel",
+                   "bandeja", "publicacion", "redes", "registro", "mides")
 
 
 class AvancePaso(db.Model):
@@ -306,7 +308,7 @@ CHECKLIST = (
     ("camara", "Cámara encuadrada y con buena luz"),
     ("internet", "Internet estable"),
     ("streamyard", "StreamYard abierto con el título del evento"),
-    ("obs", "OBS abierto (la app empieza a grabar sola)"),
+    ("celular", "Celular grabando la segunda toma (video limpio, sin cintillas)"),
     ("guion", "Guion e intenciones a la mano"),
     ("reloj", "Reloj del evento listo"),
 )

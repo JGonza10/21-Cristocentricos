@@ -31,7 +31,14 @@ def test_migracion_agrega_columnas_sin_borrar_datos(tmp_path):
         assert db.session.execute(db.text("PRAGMA journal_mode")).scalar() == "wal"
 
 
+def test_planificador_version_corta(app):
+    sched = worker.crear_planificador(app)
+    ids = {j.id for j in sched.get_jobs()}
+    assert ids == {"latido", "carrusel", "reels", "recortes", "avisos", "ideas", "grabacion", "bitacora"}
+
+
 def test_planificador_tiene_todos_los_agentes(app):
+    app.config["VERSION_CORTA"] = False
     sched = worker.crear_planificador(app)
     ids = {j.id for j in sched.get_jobs()}
     assert ids == {"latido", "carrusel", "reels", "recortes", "publicacion", "reparto", "invitaciones", "reporte",

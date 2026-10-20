@@ -1,5 +1,6 @@
 """Comandos de consola: flask --app app crear-usuario / cambiar-password / paquete-demo."""
 from datetime import date, timedelta
+from pathlib import Path
 
 import click
 from flask import current_app
@@ -89,6 +90,55 @@ def registrar(app):
         g.estado, g.error = "nueva", None
         db.session.commit()
         click.echo("Listo: el worker la procesará en los próximos minutos.")
+
+    @app.cli.command("estilo-analizar")
+    def estilo_analizar():
+        """Mide el video de referencia del cliente y saca cuadros para armar estilo.json.
+
+        Toma cada video de estilo_cliente/referencia/ y deja estilo_cliente/analisis/<nombre>/
+        con hoja.jpg (todos los cuadros juntos), cuadros/ y datos.json.
+        """
+        from servicios import estilo
+        raiz = estilo.preparar_carpeta(Path(app.config["ESTILO_DIR"]))
+        videos = [v for v in sorted((raiz / "referencia").iterdir())
+                  if v.is_file() and v.suffix.lower() in estilo.VIDEO]
+        if not videos:
+            raise click.ClickException(f"Pon el video del cliente en {raiz / 'referencia'} y vuelve a correrlo.")
+        for v in videos:
+            click.echo(f"Analizando {v.name}…")
+            d = estilo.analizar(v, raiz / "analisis" / v.stem)
+            click.echo(f"  {d['ancho']}×{d['alto']} · {d['duracion']} s · {len(d['cortes_de_escena'])} cortes · "
+                       f"brillo {d['brillo_promedio']} · volumen {d['volumen_lufs']} LUFS")
+        herramientas = [h.name for h in sorted((raiz / "herramientas").iterdir()) if h.is_file()]
+        click.echo(f"Herramientas encontradas ({len(herramientas)}): {', '.join(herramientas) or 'ninguna'}")
+        click.echo(f"Listo. Revisa {raiz / 'analisis'} y ajusta {raiz / 'estilo.json'}.")
+
+    @app.cli.command("estilo-probar")
+    @click.argument("video")
+    @click.option("--inicio", type=float, default=0.0, help="Segundo donde empieza el reel de prueba.")
+    @click.option("--fin", type=float, default=30.0, help="Segundo donde termina.")
+    @click.option("--tema", default="Tema de prueba", help="Texto para {tema}.")
+    @click.option("--fecha", default="", help="Fecha del evento AAAA-MM-DD (para la imagen del tema).")
+    def estilo_probar(video, inicio, fin, tema, fecha):
+        """Hace un reel de prueba con estilo.json, sin tocar la base de datos.
+
+        Ejemplo: flask --app app estilo-probar grabaciones/celular.mp4 --inicio 120 --fin 160
+        El resultado queda en estilo_cliente/pruebas/.
+        """
+        from datetime import datetime
+        from servicios import estilo
+        raiz = estilo.preparar_carpeta(Path(app.config["ESTILO_DIR"]))
+        ruta = Path(video)
+        if not ruta.is_file():
+            raise click.ClickException(f"No encontré el video {ruta}.")
+        salida = raiz / "pruebas" / f"prueba_{datetime.now():%Y%m%d_%H%M%S}.mp4"
+        try:
+            r = estilo.editar_reel(str(ruta), inicio, fin, salida, raiz, Path(app.config["FUENTES_DIR"]),
+                                   [], {"tema": tema, "fecha": fecha, "fecha_iso": fecha,
+                                        "canal": app.config["CANAL_NOMBRE"], "frase": ""})
+        except estilo.ErrorEstilo as e:
+            raise click.ClickException(str(e)) from None
+        click.echo(f"Listo: {salida} ({r['duracion']} s, {r['capas']} capas).")
 
     @app.cli.command("repartir")
     def repartir():

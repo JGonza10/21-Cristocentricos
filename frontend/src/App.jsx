@@ -10,14 +10,15 @@ import Configuracion from './paginas/Configuracion.jsx'
 import Estadisticas from './paginas/Estadisticas.jsx'
 import Modal from './componentes/Modal.jsx'
 import Ideas from './componentes/Ideas.jsx'
+import { VERSION_CORTA } from './version.js'
 
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
-  { id: 'contenido', nombre: 'Contenido' },
+  { id: 'contenido', nombre: VERSION_CORTA ? 'Material' : 'Contenido' },
   { id: 'evento', nombre: 'Evento' },
-  { id: 'estadisticas', nombre: 'Estadísticas', corto: 'Datos' },
+  { id: 'estadisticas', nombre: 'Estadísticas', corto: 'Datos', oculta: VERSION_CORTA },
   { id: 'configuracion', nombre: 'Configuración', corto: 'Ajustes' },
-]
+].filter((p) => !p.oculta)
 
 function pestanaDeUrl() {
   const id = window.location.hash.replace('#', '')
@@ -89,7 +90,7 @@ export default function App() {
       </header>
 
       <main className="envoltura" role="tabpanel">
-        {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} alVerDiagrama={cerrarAvisoDiagrama} />}
+        {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} alVerDiagrama={cerrarAvisoDiagrama} abrirIdeas={() => setIdeas(true)} />}
         {pestana === 'contenido' && <Contenido />}
         {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
         {pestana === 'estadisticas' && <Estadisticas ir={ir} />}

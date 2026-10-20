@@ -1,4 +1,4 @@
-"""Avance guiado de cada evento: los 11 pasos del diagrama de Inicio, en orden.
+"""Avance guiado de cada evento: los 7 pasos de la versión corta, en orden.
 
 Cada paso está hecho, omitido (no era necesario) o pendiente. Muchos se comprueban solos con los
 datos del sistema; los demás se marcan a mano. El paso actual es el primero pendiente: solo ese se
@@ -13,28 +13,23 @@ from datetime import date, timedelta
 from flask import Blueprint, current_app, g, jsonify, request
 
 from .extensiones import db
-from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, BitacoraEvento, Grabacion, Paquete, Reporte, Tema, Turno
+from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, BitacoraEvento, Grabacion, Paquete, Tema, Turno
 from .seguridad import login_requerido
 
 bp = Blueprint("avance", __name__, url_prefix="/api/avance")
 
 DIAS_ATRAS = 60  # la bitácora revisa hasta 60 días atrás por si el worker estuvo apagado
 
-# Cómo se cumple cada paso (lo ve la persona en la tarjeta).
+# Cómo se cumple cada paso (lo ve la persona en la tarjeta). Versión corta: 7 pasos.
 COMO = {
-    "tema": "Se marca solo cuando el evento tiene tema y guion guardados en el calendario.",
-    "turnos": "Se marca solo cuando el evento tiene quién dirija.",
-    "difusion": "Se marca solo cuando el material de difusión del evento ya se revisó en la bandeja.",
+    "tema": "Se marca solo cuando el evento tiene tema guardado en el calendario.",
+    "guion": "Se marca solo cuando el guion está guardado. Si no hay guion, «Preparar guion con Claude» "
+             "copia las instrucciones para buscar el tema en fuentes de la Iglesia; pega el resultado y guarda.",
+    "difusion": "Se marca solo cuando las 5 imágenes de difusión están listas (salen en cuanto se guarda el tema).",
     "revision": "Se marca solo cuando palomeas toda la revisión técnica del día.",
-    "vivo": "Se marca solo al terminar el horario del evento (11 am).",
-    "grabacion": "Se marca solo cuando llega la grabación (OBS o subida desde la app) y se procesa.",
-    "reels": "Se marca solo cuando los reels del evento llegan a la bandeja.",
-    "carrusel": "Se marca solo cuando el carrusel con escenas del video llega a la bandeja.",
-    "bandeja": "Se marca solo cuando ya no queda nada de este evento por revisar.",
-    "publicacion": "Se marca solo cuando todo lo aprobado ya se subió o quedó en su carpeta.",
-    "redes": "Se marca solo cuando no queda nada por subir a mano ni con error.",
-    "registro": "Se marca solo: la app guarda el registro del video cuando termina la publicación.",
-    "mides": "Se marca solo cuando el reporte semanal de esa semana ya está hecho (lunes 8 am).",
+    "grabacion": "Se marca solo cuando llega a grabaciones/ el video limpio del celular (o se sube desde la app).",
+    "reels": "Se marca solo cuando los 5 reels editados con el estilo del cliente están listos en Material.",
+    "ideas": "Último paso: guarda en «Ideas» lo que surgió en el evento y márcalo como hecho (u omítelo).",
 }
 
 
@@ -74,76 +69,37 @@ def _plural(n: int, uno: str, varios: str) -> str:
 
 def _automatico(f: date) -> dict:
     """{paso: (estado, detalle)} de lo que el sistema puede comprobar solo."""
-    from agentes import fechas
     r = {}
     tema = db.session.get(Tema, f)
-    if tema and tema.guion.strip():
+    if tema:
         r["tema"] = ("hecho", f"Tema: {tema.titulo}.")
-    elif tema:
-        r["tema"] = ("pendiente", f"Tema: {tema.titulo}. Falta el guion.")
+        if tema.guion.strip():
+            r["guion"] = ("hecho", "Guion guardado.")
+        else:
+            r["guion"] = ("pendiente", "Sin guion. Usa «Preparar guion con Claude» para buscar el tema en "
+                                       "fuentes de la Iglesia, o márcalo como omitido si no hace falta.")
     if tema and tema.checklist:
         marcas = tema.checklist
         faltan = [t for k, t in CHECKLIST if not marcas.get(k)]
-        r["revision"] = ("hecho", "Revisión técnica completa.") if not faltan else             ("pendiente", f"Faltan {len(faltan)} de {len(CHECKLIST)} puntos de la revisión.")
+        r["revision"] = ("hecho", "Revisión técnica completa.") if not faltan else \
+            ("pendiente", f"Faltan {len(faltan)} de {len(CHECKLIST)} puntos de la revisión.")
 
-    dirige = Turno.query.filter_by(fecha=f, rol="dirige").first()
-    if dirige:
-        r["turnos"] = ("hecho", f"Dirige {dirige.integrante.nombre}.")
-
-    if fechas.ahora_cdmx() >= fechas.fin(f):
-        r["vivo"] = ("hecho", "El horario del evento ya terminó.")
+    difusion = [p for p in Paquete.query.filter_by(fecha_evento=f, tipo="carrusel").all() if momento(p) == "antes"]
+    if difusion:
+        n = sum(len(p.archivos or []) for p in difusion[-1:])
+        r["difusion"] = ("hecho", f"{_plural(n, 'imagen de difusión lista', 'imágenes de difusión listas')} en Material.")
 
     grab = Grabacion.query.filter_by(fecha_evento=f).order_by(Grabacion.id.desc()).first()
-    if grab and grab.estado == "lista":
-        r["grabacion"] = ("hecho", f"Llegó {grab.nombre}.")
+    if grab and grab.estado == "error":
+        r["grabacion"] = ("pendiente", grab.error or "La grabación falló.")
     elif grab:
-        r["grabacion"] = ("pendiente", "Procesando la grabación." if grab.estado != "error" else (grab.error or "La grabación falló."))
+        r["grabacion"] = ("hecho", f"Llegó {grab.nombre}.")
 
-    todos = Paquete.query.filter_by(fecha_evento=f).all()
-    antes = [p for p in todos if momento(p) == "antes"]
-    paquetes = [p for p in todos if momento(p) == "despues"]
-    if antes:
-        pend = [p for p in antes if p.estado == "pendiente"]
-        r["difusion"] = ("pendiente", f"{_plural(len(pend), 'pieza de difusión espera', 'piezas de difusión esperan')} tu revisión.")             if pend else ("hecho", f"Difusión revisada: {_plural(sum(p.estado == 'aprobado' for p in antes), 'pieza aprobada', 'piezas aprobadas')}.")
-
-    reels = [p for p in paquetes if p.tipo == "reel"]
+    reels = [p for p in Paquete.query.filter_by(fecha_evento=f, tipo="reel").all() if momento(p) == "despues"]
     if reels:
-        r["reels"] = ("hecho", f"{_plural(len(reels), 'reel llegó', 'reels llegaron')} a la bandeja.")
-    if any(p.tipo == "carrusel" for p in paquetes):
-        r["carrusel"] = ("hecho", "El carrusel con escenas del video llegó a la bandeja.")
-
-    pendientes = [p for p in paquetes if p.estado == "pendiente"]
-    aprobados = [p for p in paquetes if p.estado == "aprobado"]
-    if paquetes and not pendientes:
-        r["bandeja"] = ("hecho", f"{_plural(len(aprobados), 'aprobado', 'aprobados')}, "
-                                 f"{_plural(len(paquetes) - len(aprobados), 'rechazado', 'rechazados')}.")
-    elif pendientes:
-        r["bandeja"] = ("pendiente", f"{_plural(len(pendientes), 'paquete espera', 'paquetes esperan')} tu revisión.")
-
-    if paquetes and not pendientes and not aprobados:
-        r["publicacion"] = ("omitido", "No hubo nada aprobado para publicar.")
-        r["redes"] = ("omitido", "No hubo nada aprobado para publicar.")
-    elif aprobados:
-        pubs = [x for p in aprobados for x in p.publicaciones]
-        sin_pub = [p for p in aprobados if not p.publicaciones]
-        if not sin_pub and not any(x.estado == "subiendo" for x in pubs):
-            r["publicacion"] = ("hecho", f"{_plural(len(pubs), 'publicación preparada', 'publicaciones preparadas')}.")
-        else:
-            r["publicacion"] = ("pendiente", "El agente de publicación está trabajando.")
-        faltan = [x for x in pubs if x.estado in ("listo_manual", "error", "subiendo")]
-        if pubs and not sin_pub and not faltan:
-            r["redes"] = ("hecho", "Todo quedó publicado.")
-        elif faltan:
-            manual = sum(1 for x in faltan if x.estado == "listo_manual")
-            error = sum(1 for x in faltan if x.estado == "error")
-            partes = ([f"{manual} por subir a mano"] if manual else []) + ([f"{error} con error"] if error else [])
-            r["redes"] = ("pendiente", ", ".join(partes) + "." if partes else "Subiendo…")
-    if r.get("redes", ("",))[0] in ("hecho", "omitido"):
-        r["registro"] = ("hecho", "Quedó en el registro de la app (descárgalo desde el reporte).")
-
-    lunes = f - timedelta(f.weekday())
-    if db.session.get(Reporte, lunes):
-        r["mides"] = ("hecho", "El reporte semanal ya está listo.")
+        r["reels"] = ("hecho", f"{_plural(len(reels), 'reel editado listo', 'reels editados listos')} en Material.")
+    elif grab and grab.estado in ("nueva", "procesando"):
+        r["reels"] = ("pendiente", "Editando los reels con el estilo del cliente (tarda unos minutos por reel).")
     return r
 
 

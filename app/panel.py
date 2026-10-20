@@ -20,9 +20,10 @@ AGENTES = {
     "reporte": "Reporte semanal",
     "avisos": "Avisos del tema",
     "ideas": "Ideas por voz",
-    "grabacion": "Grabación con OBS",
+    "grabacion": "Grabación con OBS (apagada en la versión corta)",
     "bitacora": "Bitácora de eventos",
 }
+OCULTOS = {"publicacion", "turnos", "reporte", "grabacion"}   # no corren en la versión corta
 LATIDO_MAX = timedelta(minutes=3)
 
 
@@ -56,6 +57,28 @@ def _temas_proximos(dias: int = 14) -> list[dict]:
              "guion": bool(temas[f].guion.strip()) if f in temas else False} for f in lista]
 
 
+def _estilo() -> dict:
+    """Cómo está la carpeta estilo_cliente/ (para Inicio): referencia, herramientas y si estilo.json se lee bien."""
+    from pathlib import Path
+
+    from servicios import estilo
+    raiz = Path(current_app.config["ESTILO_DIR"])
+
+    def contar(sub, tipos):
+        d = raiz / sub
+        return sum(1 for x in d.iterdir() if x.is_file() and x.suffix.lower() in tipos) if d.is_dir() else 0
+
+    r = {"carpeta": str(raiz), "referencia": contar("referencia", estilo.VIDEO),
+         "herramientas": contar("herramientas", estilo.VIDEO | estilo.IMAGEN | estilo.AUDIO | {".ttf", ".otf"}),
+         "receta": (raiz / "estilo.json").exists(), "activo": None, "error": None}
+    if r["receta"]:
+        try:
+            r["activo"] = bool(estilo.cargar(raiz).get("activo", True))
+        except estilo.ErrorEstilo as e:
+            r["error"] = str(e)
+    return r
+
+
 @bp.get("/estado")
 @login_requerido
 def estado():
@@ -64,6 +87,7 @@ def estado():
     worker = registros.get("worker")
     activo = bool(worker and worker.latido and ahora() - worker.latido < LATIDO_MAX)
     grabaciones = Grabacion.query.order_by(Grabacion.id.desc()).limit(5).all()
+    corta = current_app.config.get("VERSION_CORTA", True)
     return jsonify(
         bandeja=conteos(),
         pendientes_por_tipo=_contar(Paquete.tipo, Paquete.estado == "pendiente"),
@@ -73,12 +97,14 @@ def estado():
         ultimo_reporte=_ultimo_reporte(),
         worker_activo=activo,
         agentes=[{**(registros[n].a_dict() if n in registros else {"nombre": n}), "titulo": t}
-                 for n, t in AGENTES.items() if n != "worker"],
+                 for n, t in AGENTES.items() if n != "worker" and not (corta and n in OCULTOS)],
         grabaciones=[x.a_dict() for x in grabaciones],
         google=google.configurado(),
         meta=meta.configurado(),
         canal=current_app.config["CANAL_NOMBRE"],
         temas=_temas_proximos(),
         obs=obs.estado(),
+        version_corta=current_app.config.get("VERSION_CORTA", True),
+        estilo=_estilo(),
         ideas_nuevas=Idea.query.filter(Idea.estado.in_(("lista", "transcribiendo"))).count(),
     )

@@ -6,10 +6,10 @@ import { AVANCE, calcularVivo, ESTADOS, QUIEN } from '../pasos.js'
 import Flujo from '../componentes/Flujo.jsx'
 import Modal from '../componentes/Modal.jsx'
 import CalendarioEventos from '../componentes/CalendarioEventos.jsx'
-import ReporteSemanal from '../componentes/ReporteSemanal.jsx'
 import TemaEvento from '../componentes/TemaEvento.jsx'
 import Revision from '../componentes/Revision.jsx'
-import { ControlObs, SubirGrabacion } from '../componentes/Grabacion.jsx'
+import { SubirGrabacion } from '../componentes/Grabacion.jsx'
+import { VERSION_CORTA } from '../version.js'
 import '../styles/inicio.css'
 
 const REFRESCO_MS = 20_000
@@ -38,13 +38,13 @@ function abrirReloj() {
   window.open('/reloj', 'reloj', 'popup,width=1280,height=720')
 }
 
-export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
+export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirIdeas }) {
   const [ahora, setAhora] = useState(() => new Date())
   const [estado, setEstado] = useState(null)
   const [turnos, setTurnos] = useState({})
   const [avance, setAvance] = useState(null)
   const [fechaSel, setFechaSel] = useState(null) // null = el evento que toca atender
-  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'reporte' | 'tema' | 'subir'
+  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'tema' | 'subir'
   const [calFecha, setCalFecha] = useState(null)
   const [temaFecha, setTemaFecha] = useState(null)
   const [abiertos, setAbiertos] = useState(null) // null = automático (se abre el paso actual)
@@ -138,14 +138,12 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
   // Acción propia de cada paso (además de marcar u omitir).
   function accionDe(id) {
     switch (id) {
-      case 'tema': return { texto: 'Tema y guion', hacer: () => abrirTema(avance?.fecha) }
-      case 'turnos': return { texto: 'Abrir calendario', hacer: () => abrirCalendario(avance?.fecha) }
-      case 'vivo': return { texto: 'Abrir reloj', hacer: abrirReloj }
-      case 'grabacion': return { texto: 'Subir grabación', hacer: () => setModal('subir') }
-      case 'difusion': case 'reels': case 'carrusel': case 'bandeja': return { texto: 'Ir a la bandeja', hacer: () => ir('contenido') }
-      case 'publicacion': case 'redes': return { texto: 'Ver publicaciones', hacer: () => ir('contenido') }
-      case 'registro': return { texto: 'Descargar registro (Excel)', hacer: () => { window.location.href = '/api/registro.csv' } }
-      case 'mides': return { texto: 'Ver reporte', hacer: () => setModal('reporte') }
+      case 'tema': return { texto: 'Abrir calendario', hacer: () => abrirCalendario(avance?.fecha) }
+      case 'guion': return { texto: 'Guion (o prepararlo con Claude)', hacer: () => abrirTema(avance?.fecha) }
+      case 'difusion': case 'reels': return { texto: 'Ver en Material', hacer: () => ir('contenido') }
+      case 'revision': return { texto: 'Abrir reloj', hacer: abrirReloj }
+      case 'grabacion': return { texto: 'Subir video del celular', hacer: () => setModal('subir') }
+      case 'ideas': return { texto: 'Abrir Ideas', hacer: () => abrirIdeas?.() }
       default: return null
     }
   }
@@ -154,7 +152,6 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
   function extraDe(id) {
     if (!avance) return null
     if (id === 'revision') return <Revision key={avance.fecha} fecha={avance.fecha} alCambiar={cargarAvance} />
-    if (id === 'vivo' || id === 'grabacion') return <ControlObs alCambiar={cargar} />
     return null
   }
 
@@ -214,7 +211,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
               ? <><b>{temaProximo.tema}</b> <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Editar</button></>
               : <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Poner tema</button>}
           </p>
-          {tProximo?.dirige ? (
+          {!VERSION_CORTA && (tProximo?.dirige ? (
             <p className="meta" style={{ margin: 0 }}>
               <b>{quienes(tProximo)}</b>{' '}
               <button className="enlace" onClick={() => abrirCalendario(proximo.clave)}>Cambiar</button>
@@ -224,7 +221,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
               Todavía no se asigna quién dirige.{' '}
               <button className="enlace" onClick={() => abrirCalendario(proximo.clave)}>Asignar ahora</button>
             </p>
-          )}
+          ))}
         </section>
       )}
 
@@ -323,12 +320,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
         {guia}
       </Modal>
 
-      <Modal abierto={modal === 'calendario'} titulo="Calendario y equipo" ancho="medio" alCerrar={() => setModal(null)}>
+      <Modal abierto={modal === 'calendario'} titulo={VERSION_CORTA ? 'Calendario: fecha y tema' : 'Calendario y equipo'} ancho="medio" alCerrar={() => setModal(null)}>
         <CalendarioEventos ir={ir} fechaInicial={calFecha} alCambiar={cargar} />
-      </Modal>
-
-      <Modal abierto={modal === 'reporte'} titulo="Reporte semanal" alCerrar={() => setModal(null)}>
-        <ReporteSemanal alCambiar={cargar} />
       </Modal>
 
       <Modal abierto={modal === 'tema'} titulo={temaFecha ? `Tema del ${nombreFechaCorto(temaFecha).toLowerCase()}` : 'Tema del evento'}
@@ -336,7 +329,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama }) {
         {temaFecha && <TemaEvento fecha={temaFecha} alGuardar={cargar} />}
       </Modal>
 
-      <Modal abierto={modal === 'subir'} titulo={avance ? `Subir grabación del ${avance.nombre.toLowerCase()}` : 'Subir grabación'}
+      <Modal abierto={modal === 'subir'} titulo={avance ? `Video del celular del ${avance.nombre.toLowerCase()}` : 'Subir grabación'}
         alCerrar={() => setModal(null)}>
         {avance && <SubirGrabacion fecha={avance.fecha} alTerminar={cargar} />}
       </Modal>

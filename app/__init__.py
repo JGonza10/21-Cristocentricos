@@ -66,7 +66,14 @@ def create_app(config: dict | None = None) -> Flask:
         MEJORAR_VIDEO=os.environ.get("MEJORAR_VIDEO", "1") == "1",   # luz, color y volumen de los reels
         OBS_PASSWORD=os.environ.get("OBS_PASSWORD", ""),
         OBS_PUERTO=int(os.environ.get("OBS_PUERTO", "4455")),
-        OBS_AUTO=os.environ.get("OBS_AUTO", "1") == "1",            # grabar solo los días de evento
+        OBS_AUTO=os.environ.get("OBS_AUTO", "0") == "1",            # versión corta: OBS ya no se usa
+        # Versión corta (2026-10-19): proceso de 7 pasos; turnos, bandeja, publicación, reportes y
+        # estadísticas quedan ocultos (el código sigue ahí por si se reactivan con VERSION_CORTA=0).
+        VERSION_CORTA=os.environ.get("VERSION_CORTA", "1") == "1",
+        REEL_PROMO=os.environ.get("REEL_PROMO", "0") == "1",        # difusión: solo las 5 imágenes
+        CARRUSEL_ESCENAS=os.environ.get("CARRUSEL_ESCENAS", "0") == "1",
+        DIFUSION_AL_GUARDAR=os.environ.get("DIFUSION_AL_GUARDAR", "1") == "1",
+        ESTILO_DIR=Path(os.environ.get("ESTILO_DIR", RAIZ / "estilo_cliente")),
         EJEMPLO=os.environ.get("EJEMPLO", "0") == "1",  # solo la copia de ejemplo (ejemplo.py)
     )
     if config:

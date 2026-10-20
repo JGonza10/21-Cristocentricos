@@ -1,20 +1,40 @@
-# Cristocéntricos Automático
+# Cristocéntricos Automático · versión corta (v2.0)
 
-Convierte cada evento en vivo (lunes y viernes, 10 a 11 am) en reels y un carrusel de
-invitación, con una bandeja donde todo se aprueba antes de publicarse. Corre en la PC de Gonza.
+Convierte cada evento en vivo (lunes y viernes, 10 a 11 am) en **5 imágenes de difusión** y **5 reels
+editados con el estilo que pide el cliente**. Corre en la PC de Gonza.
 
-**Estado:** las 8 fases del plan están programadas y probadas (ver `CLAUDE.md`). Falta conectarlas
-con tus cuentas reales: Google (YouTube y Calendar) y, si quieres, Meta.
+**Versión corta (2026-10-19):** el proceso de cada evento son 7 pasos. Turnos, bandeja de aprobación,
+publicación automática, reporte semanal y estadísticas quedan **ocultos** (el código sigue ahí;
+`VERSION_CORTA=0` los regresa). Lo que había hasta esta fecha está en `versiones/Cristocentricos v.1.0.zip`.
 
 | Qué hace | Cuándo |
 |---|---|
-| Carrusel de invitación (5 imágenes + texto) | Solo, 2 días antes de cada lunes y viernes |
-| 3 reels verticales con subtítulos | Solo, cuando llega la grabación a `grabaciones/` |
-| Bandeja: aprobar, rechazar, editar texto, ajustar recorte | Cuando tú o el aprobador entran |
-| Carpetas `subir_manual/<red>/` y subida a YouTube (privado) | Solo, en cuanto algo se aprueba |
-| Reparto de turnos e invitaciones de Google Calendar | Domingos 6 pm (y botón «Repartir ahora») |
-| Reloj CDMX con cuenta regresiva (tema perla), se abre en grande desde un enlace chico | Pestaña Evento → «Reloj» (`/reloj`) |
-| Facebook e Instagram automáticos (opcional) | Si activas `META_AUTO=1` |
+| 5 imágenes de difusión con su texto | En cuanto se guarda el tema en el calendario |
+| 5 reels editados con el estilo del cliente (luz, enfoque, sin ruido, sus imágenes y animaciones) | Solo, cuando llega el video del celular a `grabaciones/` |
+| Material: ver, ajustar el texto y descargar | Pestaña **Material** |
+| Ideas escritas o por voz | Botón «Ideas» (y último paso de cada evento) |
+
+### Los 7 pasos de cada evento
+1. **Calendario:** se pone la cita (el evento) y el tema a grabar. Ahí mismo se sube la **imagen del tema**
+   (la que va al centro de los reels, como el Santo Rostro).
+2. **Guion, solo si lo hay.** Si no lo hay, «Preparar guion con Claude» copia las instrucciones para que Claude
+   busque el tema en fuentes de la Iglesia (Biblia, Catecismo, Magisterio, santos) con sus citas y arme el guion.
+3. **Difusión:** desde que el tema se guarda salen solas 5 imágenes (pestaña Material).
+4. **Revisión técnica:** audio, cámara, internet, StreamYard, **celular grabando la segunda toma**, guion y reloj.
+   (OBS ya no se usa.)
+5. **Grabación:** StreamYard guarda el video como sale del stream (con cintillas) → canal de TV y la red indicada.
+   El **celular** graba el video limpio (sin cintillas) → se copia a **`grabaciones/`** (o «Subir video del celular»).
+6. **5 reels con el estilo del cliente:** se toman los 5 mejores momentos del video limpio y cada uno se edita
+   igual que la referencia del cliente con sus herramientas (carpeta **`estilo_cliente/`**, ver su `LEEME.md`).
+7. **Ideas:** se guarda lo que surgió en el evento.
+
+### Carpetas que usas
+| Carpeta | Qué pones ahí |
+|---|---|
+| `grabaciones/` | El video limpio del celular de cada evento (de donde salen los reels) |
+| `estilo_cliente/referencia/` | El video que entregó el cliente como muestra de la edición |
+| `estilo_cliente/herramientas/` | Sus imágenes, animaciones, intro, cierre, música y fuentes |
+| `estilo_cliente/estilo.json` | La receta de edición (la ajusta Claude con `estilo-analizar`) |
 
 ## Requisitos (Windows)
 - Python 3.12 o superior
@@ -57,31 +77,18 @@ cd ..
 ## Uso diario
 Doble clic en `iniciar.bat`. Se abren **dos ventanas que no debes cerrar**:
 1. **Servidor**: la página en http://localhost:5021.
-2. **Agentes**: preparan carruseles, reels, publicaciones y turnos según su horario.
+2. **Agentes**: preparan la difusión y editan los reels según su horario.
 
 Si la ventana de agentes está cerrada, Inicio muestra «Agentes: Apagados».
 
-### Flujo de cada evento (desde el 2026-10-17)
-Cada evento (lunes y viernes, 10 a 11 am) tiene un **tema**. Inicio guía los 13 pasos en orden:
-1. **Tema y guion**: en el calendario (o en la pestaña Evento) pones el tema con anticipación; lo
-   ideal es tener siempre los próximos 2 eventos con tema. Al guardarlo, al equipo le llega un correo
-   y se actualiza su invitación de Google Calendar. «Preparar guion con Claude» copia las
-   instrucciones y abre Claude: pégalas, y el guion que te dé pégalo de vuelta y guarda.
-2. **Turnos**: quién dirige y quién apoya.
-3. **Difusión**: en cuanto hay tema (hasta 2 semanas antes) llegan a la bandeja un carrusel de 5
-   imágenes y un reel promocional de 15 s (súbelo con un audio de moda en cada red).
-4. **Revisión técnica**: la lista de audio, cámara, internet, StreamYard, OBS, guion y reloj.
-5. **Transmisión** por StreamYard, como siempre. **OBS graba solo** de 9:55 a 11:05 (o con el botón
-   «Empezar a grabar») y deja el video en `grabaciones/`.
-6. Si se grabó en otra computadora: **«Subir grabación»** (por partes; se reanuda si se corta).
-7. **5 reels** con mejora automática de luz, color y volumen, y un **carrusel con escenas** del video.
-8. **Bandeja**: apruebas o rechazas. Lo aprobado se publica o queda en `subir_manual/<red>/`.
-9. **Registro** automático (descárgalo para Excel desde el reporte) y **reporte semanal** los lunes.
+### Estilo del cliente (reels)
+```powershell
+.venv\Scripts\flask --app app estilo-analizar                      # mide la referencia y saca sus cuadros
+.venv\Scripts\flask --app app estilo-probar grabaciones\celular.mp4 --inicio 120 --fin 165
+```
+Todo el detalle de la receta está en `estilo_cliente/LEEME.md`.
 
-**Ideas**: botón «Ideas» arriba a la derecha; se escriben o se graban por voz (Whisper las pasa a
-texto en esta PC) y cualquiera se puede volver el tema de un evento.
-
-## OBS (grabación automática)
+## OBS (solo versión 1.0: en la versión corta ya no se usa)
 Una sola vez en la PC donde corre la app (OBS ya instalado con `winget install OBSProject.OBSStudio`):
 ```powershell
 .venv\Scripts\flask --app app obs-configurar
@@ -240,7 +247,9 @@ flask --app app cambiar-password gonza
 flask --app app paquete-demo   # paquetes de ejemplo en la bandeja
 flask --app app carrusel 2026-10-19 [--forzar]
 flask --app app reels-reintentar evento.mkv
-flask --app app repartir       # turnos vacíos de las próximas 2 semanas
+flask --app app estilo-analizar   # mide el video de referencia del cliente
+flask --app app estilo-probar grabaciones/celular.mp4 --inicio 120 --fin 165
+flask --app app repartir       # turnos vacíos de las próximas 2 semanas (versión 1.0)
 flask --app app google-autorizar
 python -m agentes.worker       # la ventana de agentes, a mano
 pytest                 # pruebas

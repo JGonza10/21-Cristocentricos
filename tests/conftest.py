@@ -22,6 +22,7 @@ def app(tmp_path):
         "PAQUETES_DIR": tmp_path / "paquetes",
         "GRABACIONES_DIR": tmp_path / "grabaciones",
         "SECRETOS_DIR": tmp_path / "secretos",
+        "ESTILO_DIR": tmp_path / "estilo_cliente",   # sin estilo.json = look de la v1.0
     })
     with app.app_context():
         db.session.add(Usuario(usuario="gonza", nombre="Gonza", hash_password=hashear(PASSWORD)))

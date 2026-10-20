@@ -5,13 +5,13 @@
 Horarios (hora CDMX):
   - cada minuto ........ latido (para que Inicio sepa que el worker está vivo)
   - cada 15 minutos ..... difusión de los eventos con tema (próximas 2 semanas)
-  - cada 10 minutos ..... invitaciones de Google Calendar
   - cada 5 minutos ...... avisos del tema por correo
-  - cada minuto ......... ideas por voz a texto · grabación automática con OBS (días de evento)
+  - cada minuto ......... ideas por voz a texto · grabación automática con OBS (solo si OBS_AUTO=1)
   - cada 2 minutos ...... revisar grabaciones/ (además, watchdog avisa al instante)
   - cada 30 segundos .... recortes de reels pedidos desde la bandeja
+  Solo con VERSION_CORTA=0 (proceso completo de la v1.0):
   - cada 3 minutos ...... publicar lo aprobado
-  - domingo 6:00 pm ..... reparto de turnos de la semana
+  - domingo 6:00 pm ..... reparto de turnos de la semana · cada 10 min invitaciones de Calendar
   - lunes 8:00 am ....... reporte semanal de la semana anterior
 """
 import logging
@@ -71,6 +71,11 @@ def crear_planificador(app) -> BlockingScheduler:
                   "interval", minutes=2, id="reels", next_run_time=ahora + timedelta(seconds=10))
     sched.add_job(trabajo("recortes", reels.aplicar_recortes, lambda n: f"{n} recortes aplicados"),
                   "interval", seconds=30, id="recortes")
+    if app.config.get("VERSION_CORTA", True):
+        # Versión corta: sin turnos, invitaciones, publicación ni reporte semanal (ocultos, no borrados).
+        sched.add_job(trabajo("bitacora", _archivar, lambda n: f"{_plural(n, 'evento archivado', 'eventos archivados')}"),
+                      "cron", hour="*", minute=7, id="bitacora", next_run_time=ahora + timedelta(seconds=40))
+        return sched
     sched.add_job(trabajo("publicacion", publicacion.tarea,
                           lambda n: f"{_plural(n, 'paquete aprobado', 'paquetes aprobados')} revisados"),
                   "interval", minutes=3, id="publicacion", next_run_time=ahora + timedelta(seconds=15))
@@ -116,12 +121,15 @@ def main() -> None:
 
     carpeta = Path(app.config["GRABACIONES_DIR"])
     carpeta.mkdir(parents=True, exist_ok=True)
+    from servicios.estilo import preparar_carpeta
+    preparar_carpeta(Path(app.config["ESTILO_DIR"]))
     sched = crear_planificador(app)
     vigilante = Observer()
     vigilante.schedule(AvisoGrabaciones(sched), str(carpeta), recursive=False)
     vigilante.start()
     print(f"Agentes de {app.config['CANAL_NOMBRE']} trabajando (no cierres esta ventana).")
-    print(f"Vigilando: {carpeta}")
+    print(f"Vigilando: {carpeta}  (pon aquí el video limpio del celular)")
+    print(f"Estilo del cliente: {app.config['ESTILO_DIR']}")
     try:
         sched.start()
     except (KeyboardInterrupt, SystemExit):
