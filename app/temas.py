@@ -152,6 +152,63 @@ def borrar_imagen(fecha: str):
     return jsonify(imagen=False)
 
 
+# --- Guion desde un archivo: devuelve el texto para revisarlo antes de guardar ------------
+
+GUION_ARCHIVO_MAX = 15 * 1024 * 1024
+EXT_GUION = {".txt", ".md", ".docx", ".pdf"}
+
+
+def texto_de_archivo(nombre: str, datos: bytes) -> str:
+    """Saca el texto de un .txt, .md, .docx o .pdf (sin ejecutar nada del archivo)."""
+    ext = Path(nombre or "").suffix.lower()
+    if ext not in EXT_GUION:
+        raise ErrorTema("Sube el guion en .txt, .md, .docx o .pdf.")
+    if ext in (".txt", ".md"):
+        for cod in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                return datos.decode(cod)
+            except UnicodeDecodeError:
+                continue
+    if ext == ".docx":
+        import zipfile
+        from xml.etree.ElementTree import ParseError
+
+        from defusedxml import ElementTree  # sin entidades externas ni bombas XML
+        w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        try:
+            with zipfile.ZipFile(io.BytesIO(datos)) as z:
+                info = z.getinfo("word/document.xml")
+                if info.file_size > 50 * 1024 * 1024:  # un .docx inflado a propósito no se descomprime
+                    raise ErrorTema("El documento es demasiado grande.")
+                raiz = ElementTree.fromstring(z.read(info))
+        except (zipfile.BadZipFile, KeyError, ParseError):
+            raise ErrorTema("No se pudo leer el .docx. Guárdalo de nuevo desde Word y prueba otra vez.") from None
+        parrafos = ["".join(t.text or "" for t in p.iter(f"{w}t")) for p in raiz.iter(f"{w}p")]
+        return "\n".join(parrafos)
+    try:
+        from pypdf import PdfReader
+        lector = PdfReader(io.BytesIO(datos))
+        return "\n\n".join((pag.extract_text() or "").strip() for pag in lector.pages[:200])
+    except Exception:  # PDF dañado o protegido
+        current_app.logger.exception("No se pudo leer el PDF del guion")
+        raise ErrorTema("No se pudo leer el PDF. Si es una imagen escaneada, copia el texto a mano.") from None
+
+
+@bp.post("/<fecha>/guion/archivo")
+@login_requerido
+def guion_de_archivo(fecha: str):
+    """Recibe el archivo crudo (cabecera X-Nombre con el nombre) y devuelve {"texto"} para revisarlo y guardarlo."""
+    _fecha(fecha)
+    request.max_content_length = GUION_ARCHIVO_MAX
+    texto = texto_de_archivo(request.headers.get("X-Nombre", ""), request.get_data(cache=False))
+    texto = "\n".join(linea.rstrip() for linea in texto.replace("\r\n", "\n").split("\n")).strip()
+    if not texto:
+        raise ErrorTema("El archivo no trae texto. Si es una imagen escaneada, copia el guion a mano.")
+    if len(texto) > LIMITES["guion"]:
+        raise ErrorTema(f"El guion pasa de {LIMITES['guion']:,} caracteres. Recórtalo o sube solo la parte del evento.")
+    return jsonify(texto=texto)
+
+
 @bp.put("/<fecha>")
 @login_requerido
 def guardar(fecha: str):

@@ -3,6 +3,8 @@ import { api } from '../api.js'
 import { nombreFecha } from '../evento.js'
 import { REDES, fechaDeClave, fechaHora, segundosATexto } from '../util.js'
 import { VERSION_CORTA } from '../version.js'
+import Modal from '../componentes/Modal.jsx'
+import Prompter from '../componentes/Prompter.jsx'
 
 const FILTROS = [
   { id: 'pendiente', nombre: 'Pendientes' },
@@ -58,6 +60,7 @@ export default function Contenido() {
 
   return (
     <>
+      {VERSION_CORTA && <TarjetaPrompter />}
       <section className="tarjeta">
         <span className="etiqueta">{VERSION_CORTA ? 'Material del evento' : 'Bandeja de aprobación'}</span>
         <p className="chico-texto" style={{ marginBottom: VERSION_CORTA ? 0 : 14 }}>
@@ -315,5 +318,42 @@ function Publicaciones({ paquete: p, ocupado, llamar, alCambiar }) {
         })}
       </ul>
     </div>
+  )
+}
+
+
+/** Primera tarjeta de Material (Gonza, 2026-10-20): el guion del evento que toca, en el Prompter. */
+function TarjetaPrompter() {
+  const [evento, setEvento] = useState(undefined) // undefined = cargando
+  const [guion, setGuion] = useState('')
+  const [abierto, setAbierto] = useState(false)
+
+  useEffect(() => {
+    api('/api/avance/activo')
+      .then((a) => api(`/api/temas/${a.fecha}`).then((d) => { setEvento(a); setGuion(d.tema?.guion ?? '') }))
+      .catch(() => setEvento(null))
+  }, [])
+
+  return (
+    <section className="tarjeta prompter-tarjeta">
+      <span className="etiqueta">Ver guion en Prompter</span>
+      {evento === undefined && <p className="chico-texto">Cargando…</p>}
+      {evento && (
+        <>
+          <p className="chico-texto">
+            {evento.nombre}{evento.tema ? <> · <b>{evento.tema}</b></> : ''}.{' '}
+            {guion.trim() ? 'El guion a pantalla completa, con letra grande que sube sola a la velocidad que elijas.'
+              : 'Este evento todavía no tiene guion: agrégalo en Inicio, paso 2.'}
+          </p>
+          <div className="botones">
+            <button className="btn" disabled={!guion.trim()} onClick={() => setAbierto(true)}>Abrir Prompter</button>
+          </div>
+        </>
+      )}
+      {evento === null && <p className="chico-texto">No se pudo cargar el evento.</p>}
+      <Modal abierto={abierto} titulo={evento ? `Prompter · ${evento.tema || evento.nombre}` : 'Prompter'} ancho="completo" alCerrar={() => setAbierto(false)}>
+        <Prompter texto={guion} />
+      </Modal>
+    </section>
   )
 }

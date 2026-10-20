@@ -1,6 +1,7 @@
 /* Tokens de diseño de la app de Cristocéntricos ("sistema del equipo").
-   Concepto: panel lavanda claro; el morado es el único color de acción;
-   la pestaña activa lleva el degradado lila → rosa.
+   Claro: panel lavanda; el morado es el color de acción; la pestaña activa lleva el degradado lila → rosa.
+   Oro (antes "Oscuro", 2026-10-20): los colores de Kestrel (azul noche) con el oro del logo en lugar del
+   naranja; títulos con serif clásica como el logo, filete dorado bajo el menú y brillo dorado en lo activo.
    OJO: las imágenes del carrusel para redes siguen en blanco y vino (ver CLAUDE.md §4.4). */
 :root {
   --bg:#f9f7fc; --surface:#ffffff; --surface-2:#faf8fd;
@@ -8,35 +9,49 @@
   --accent:#7d45cb; --accent-strong:#65409a; --accent-soft:#f0e8fc; --on-accent:#ffffff;
   --grad-tab:linear-gradient(90deg,#a56be5 0%,#cd76dd 100%);
   --grad-hero:linear-gradient(135deg,#faf7ff 0%,#efeafe 55%,#e9e9ff 100%);
+  --grad-titulo:none; --filete:var(--line); --brillo:none;
   --ok:#2b7a4b; --ok-soft:#e1f1e7; --warn:#8a5d00; --warn-soft:#fbf0d3;
   --off:#a39bab; --shadow:0 1px 2px rgba(36,27,49,.04);
   --err:#b4234a; --err-soft:#fbe4ea; --activo:#2f6fd0; --activo-soft:#e3edfc;
+  /* colores de los 7 pasos en el diagrama (contorno de cada paso) */
+  --p1:#7d45cb; --p2:#2f6fd0; --p3:#c2410c; --p4:#0f766e; --p5:#b4234a; --p6:#8a5d00; --p7:#2b7a4b;
   --f-body:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-titulo:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
   --f-mono:'JetBrains Mono',ui-monospace,Consolas,'Courier New',monospace;
   --r-card:20px; --r-item:14px; --r-btn:12px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:#15111c; --surface:#1e1828; --surface-2:#241d30;
-    --ink:#f1ecf8; --ink-2:#d2c7e0; --muted:#b3a8c2; --muted-2:#9d92ac; --line:#3a3048;
-    --accent:#b48cf0; --accent-strong:#c9a8f5; --accent-soft:#2e2442; --on-accent:#1a1225;
-    --grad-tab:linear-gradient(90deg,#8b55d0 0%,#b45cc4 100%);
-    --grad-hero:linear-gradient(135deg,#221a31 0%,#211c38 55%,#1f2140 100%);
-    --ok:#78c995; --ok-soft:#1b3326; --warn:#e6b84e; --warn-soft:#3a2f12;
-    --off:#6e6479; --shadow:none;
-    --err:#f39ab0; --err-soft:#3d1a26; --activo:#8fb8ff; --activo-soft:#1c2a45;
+    --bg:#05080e; --surface:#0c1420; --surface-2:#111b29;
+    --ink:#e6edf6; --ink-2:#c3cfdd; --muted:#8c9db2; --muted-2:#7d8ea4; --line:#1f2b3c;
+    --accent:#e2b25c; --accent-strong:#f2cd85; --accent-soft:rgba(226,178,92,.12); --on-accent:#05080e;
+    --grad-tab:linear-gradient(90deg,#9c6b24 0%,#e9c27a 50%,#a8772b 100%);
+    --grad-hero:radial-gradient(120% 140% at 85% 0%,rgba(226,178,92,.16) 0%,transparent 55%),linear-gradient(160deg,#0c1420 0%,#070b12 100%);
+    --grad-titulo:linear-gradient(180deg,#f6dc9f 0%,#e2b25c 55%,#b8842f 100%);
+    --filete:linear-gradient(90deg,transparent,rgba(226,178,92,.55),transparent);
+    --brillo:0 0 0 1px rgba(226,178,92,.35),0 0 22px rgba(226,178,92,.18);
+    --ok:#3fcf8e; --ok-soft:rgba(63,207,142,.13); --warn:#ffc94a; --warn-soft:rgba(255,201,74,.12);
+    --off:#55677e; --shadow:none;
+    --err:#ff6b72; --err-soft:rgba(214,43,52,.18); --activo:#3fa9ff; --activo-soft:rgba(63,169,255,.13);
+    --p1:#e2b25c; --p2:#3fa9ff; --p3:#8fe9ff; --p4:#3fcf8e; --p5:#ff6b72; --p6:#b49cff; --p7:#f6dc9f;
+    --f-titulo:'Cormorant Garamond','Times New Roman',Georgia,serif;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg:#15111c; --surface:#1e1828; --surface-2:#241d30;
-  --ink:#f1ecf8; --ink-2:#d2c7e0; --muted:#b3a8c2; --muted-2:#9d92ac; --line:#3a3048;
-  --accent:#b48cf0; --accent-strong:#c9a8f5; --accent-soft:#2e2442; --on-accent:#1a1225;
-  --grad-tab:linear-gradient(90deg,#8b55d0 0%,#b45cc4 100%);
-  --grad-hero:linear-gradient(135deg,#221a31 0%,#211c38 55%,#1f2140 100%);
-  --ok:#78c995; --ok-soft:#1b3326; --warn:#e6b84e; --warn-soft:#3a2f12;
-  --off:#6e6479; --shadow:none;
-  --err:#f39ab0; --err-soft:#3d1a26; --activo:#8fb8ff; --activo-soft:#1c2a45;
+  --bg:#05080e; --surface:#0c1420; --surface-2:#111b29;
+  --ink:#e6edf6; --ink-2:#c3cfdd; --muted:#8c9db2; --muted-2:#7d8ea4; --line:#1f2b3c;
+  --accent:#e2b25c; --accent-strong:#f2cd85; --accent-soft:rgba(226,178,92,.12); --on-accent:#05080e;
+  --grad-tab:linear-gradient(90deg,#9c6b24 0%,#e9c27a 50%,#a8772b 100%);
+  --grad-hero:radial-gradient(120% 140% at 85% 0%,rgba(226,178,92,.16) 0%,transparent 55%),linear-gradient(160deg,#0c1420 0%,#070b12 100%);
+  --grad-titulo:linear-gradient(180deg,#f6dc9f 0%,#e2b25c 55%,#b8842f 100%);
+  --filete:linear-gradient(90deg,transparent,rgba(226,178,92,.55),transparent);
+  --brillo:0 0 0 1px rgba(226,178,92,.35),0 0 22px rgba(226,178,92,.18);
+  --ok:#3fcf8e; --ok-soft:rgba(63,207,142,.13); --warn:#ffc94a; --warn-soft:rgba(255,201,74,.12);
+  --off:#55677e; --shadow:none;
+  --err:#ff6b72; --err-soft:rgba(214,43,52,.18); --activo:#3fa9ff; --activo-soft:rgba(63,169,255,.13);
+  --p1:#e2b25c; --p2:#3fa9ff; --p3:#8fe9ff; --p4:#3fcf8e; --p5:#ff6b72; --p6:#b49cff; --p7:#f6dc9f;
+  --f-titulo:'Cormorant Garamond','Times New Roman',Georgia,serif;
   color-scheme: dark;
 }

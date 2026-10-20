@@ -7,6 +7,8 @@ import Flujo from '../componentes/Flujo.jsx'
 import Modal from '../componentes/Modal.jsx'
 import CalendarioEventos from '../componentes/CalendarioEventos.jsx'
 import TemaEvento from '../componentes/TemaEvento.jsx'
+import GuionEvento from '../componentes/GuionEvento.jsx'
+import CrearImagenes from '../componentes/CrearImagenes.jsx'
 import Revision from '../componentes/Revision.jsx'
 import { SubirGrabacion } from '../componentes/Grabacion.jsx'
 import { VERSION_CORTA } from '../version.js'
@@ -15,6 +17,14 @@ import '../styles/inicio.css'
 const REFRESCO_MS = 20_000
 const DIA_MS = 24 * 60 * 60 * 1000
 const CLASE_ESTADO = { ok: 'ok', activo: 'activo', espera: 'warn', error: 'err', apagado: 'off', sin: 'off' }
+// Ventanas de cada paso: al cumplirse uno se abre sola la del siguiente (Gonza, 2026-10-20).
+const VENTANA_DE_PASO = { guion: 'guion', difusion: 'imagenes' }
+const VENTANAS_DE_PASOS = ['calendario', 'tema', 'guion', 'imagenes']
+const CLAVE_VISTA = 'cristo-vista-pasos'
+
+function vistaGuardada() {
+  try { return localStorage.getItem(CLAVE_VISTA) === 'lista' ? 'lista' : 'tarjetas' } catch { return 'tarjetas' }
+}
 
 function quienes(t) {
   if (!t || (!t.dirige && t.apoyan.length === 0)) return 'Sin asignar'
@@ -44,7 +54,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   const [turnos, setTurnos] = useState({})
   const [avance, setAvance] = useState(null)
   const [fechaSel, setFechaSel] = useState(null) // null = el evento que toca atender
-  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'tema' | 'subir'
+  const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'tema' | 'guion' | 'imagenes' | 'subir'
+  const [vista, setVista] = useState(vistaGuardada) // 'tarjetas' | 'lista' (la elige cada quien)
   const [calFecha, setCalFecha] = useState(null)
   const [temaFecha, setTemaFecha] = useState(null)
   const [abiertos, setAbiertos] = useState(null) // null = automático (se abre el paso actual)
@@ -92,8 +103,18 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
     else if (numero(avance.actual) > numero(antes.actual)) {
       const sigue = pasos.find((p) => p.id === avance.actual)
       setAviso(`Paso ${numero(antes.actual)} listo${listo ? `: «${listo.t}»` : ''}. Sigue el paso ${sigue.numero}: «${sigue.t}».`)
+      // Se abre solo el siguiente: su ventana si tiene (guion, imágenes); si no, se cierra la del paso anterior
+      // y queda abierta su tarjeta.
+      const ventana = VENTANA_DE_PASO[avance.actual]
+      setModal((m) => (ventana && m !== 'diagrama' ? ventana : VENTANAS_DE_PASOS.includes(m) ? null : m))
+      if (!ventana) setTimeout(() => document.getElementById(`paso-${avance.actual}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50)
     }
   }, [avance])
+
+  function elegirVista(v) {
+    setVista(v)
+    try { localStorage.setItem(CLAVE_VISTA, v) } catch { /* sin almacenamiento */ }
+  }
 
   async function marcar(paso, accion) {
     setOcupado(true)
@@ -139,8 +160,9 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   function accionDe(id) {
     switch (id) {
       case 'tema': return { texto: 'Abrir calendario', hacer: () => abrirCalendario(avance?.fecha) }
-      case 'guion': return { texto: 'Guion (o prepararlo con Claude)', hacer: () => abrirTema(avance?.fecha) }
-      case 'difusion': case 'reels': return { texto: 'Ver en Material', hacer: () => ir('contenido') }
+      case 'guion': return { texto: 'Agregar guion', hacer: () => setModal('guion') }
+      case 'difusion': return { texto: 'Crear imágenes', hacer: () => setModal('imagenes') }
+      case 'reels': return { texto: 'Ver en Material', hacer: () => ir('contenido') }
       case 'revision': return { texto: 'Abrir reloj', hacer: abrirReloj }
       case 'grabacion': return { texto: 'Subir video del celular', hacer: () => setModal('subir') }
       case 'ideas': return { texto: 'Abrir Ideas', hacer: () => abrirIdeas?.() }
@@ -202,7 +224,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   return (
     <>
       {proximo && (
-        <section className="hero">
+        <section className="hero con-virgen">
+          <div>
           <div className="etiqueta">{proximo.estado === 'en-vivo' ? 'En vivo ahora' : 'Próximo evento'}</div>
           <h1>{proximo.nombre}</h1>
           <p className="meta">
@@ -222,6 +245,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
               <button className="enlace" onClick={() => abrirCalendario(proximo.clave)}>Asignar ahora</button>
             </p>
           ))}
+          </div>
+          <img className="hero-virgen" src="/marca/virgen.png" alt="" aria-hidden="true" width="238" height="800" />
         </section>
       )}
 
@@ -269,7 +294,44 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
         {guia}
       </section>
 
-      <section className="pasos-lista" aria-label="Pasos del proceso">
+      <div className="vista-pasos" role="group" aria-label="Ver los pasos como">
+        <span className="etiqueta">Pasos</span>
+        <div className="vista-botones">
+          <button type="button" aria-pressed={vista === 'tarjetas'} onClick={() => elegirVista('tarjetas')}>Tarjetas</button>
+          <button type="button" aria-pressed={vista === 'lista'} onClick={() => elegirVista('lista')}>Lista</button>
+        </div>
+      </div>
+
+      {vista === 'tarjetas' && (
+        <section className="pasos-tarjetas" aria-label="Pasos del proceso">
+          {pasos.map((p) => {
+            const item = porId[p.id]
+            const esActual = avance?.actual === p.id
+            const est = item?.estado ?? 'pendiente'
+            const a = accionDe(p.id)
+            return (
+              <article key={p.id} id={`paso-${p.id}`} className={`tarjeta paso-tarjeta a-${est} ${esActual ? 'es-actual' : ''}`}
+                style={{ '--paso': `var(--p${p.numero})` }}>
+                <div className="pt-cabeza">
+                  <span className={`paso-num a-${est} ${esActual ? 'es-actual' : ''}`} aria-hidden="true">{est === 'hecho' ? '✓' : est === 'omitido' ? '–' : p.numero}</span>
+                  <span className="chico-texto">{esActual ? 'Paso actual' : AVANCE[est]} · {QUIEN[p.q]}</span>
+                </div>
+                <h3>{p.t}</h3>
+                <p className="chico-texto pt-texto">{item?.detalle || p.resumen}</p>
+                {esActual && extraDe(p.id) && <div className="paso-extra">{extraDe(p.id)}</div>}
+                <div className="botones pt-botones">
+                  {a && <button className={`btn chico ${esActual ? '' : 'suave'}`} onClick={a.hacer}>{a.texto}</button>}
+                  {esActual && <button className="btn suave chico" disabled={ocupado} onClick={() => marcar(p.id, 'hecho')}>Marcar como hecho</button>}
+                  {esActual && <button className="enlace" disabled={ocupado} onClick={() => marcar(p.id, 'omitir')}>Omitir</button>}
+                  {item?.manual && <button className="enlace" disabled={ocupado} onClick={() => marcar(p.id, 'deshacer')}>Deshacer</button>}
+                </div>
+              </article>
+            )
+          })}
+        </section>
+      )}
+
+      {vista === 'lista' && <section className="pasos-lista" aria-label="Pasos del proceso">
         {pasos.map((p) => {
           const item = porId[p.id]
           const abierto = estanAbiertos.has(p.id)
@@ -310,14 +372,23 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
             </article>
           )
         })}
-      </section>
+      </section>}
 
       <Modal abierto={modal === 'diagrama'} titulo={avance ? `Proceso del ${avance.nombre.toLowerCase()}` : 'Proceso del evento'}
-        ancho="grande" alCerrar={() => setModal(null)}>
+        ancho="completo" alCerrar={() => setModal(null)}>
         {barra}
         <Flujo pasos={pasos} nodosVivo={nodos} avance={estadosAvance} actual={avance?.actual} grande alElegirPaso={elegirPaso} />
-        {mensajes}
-        {guia}
+      </Modal>
+
+      <Modal abierto={modal === 'guion'} titulo={avance ? `Agregar guion · ${avance.nombre.toLowerCase()}` : 'Agregar guion'}
+        ancho="medio" alCerrar={() => setModal(null)}>
+        {avance && <GuionEvento fecha={avance.fecha} alGuardar={cargar} alPedirTema={() => abrirCalendario(avance.fecha)} />}
+      </Modal>
+
+      <Modal abierto={modal === 'imagenes'} titulo={avance ? `Crear imágenes · ${avance.nombre.toLowerCase()}` : 'Crear imágenes'}
+        alCerrar={() => setModal(null)}>
+        {avance && <CrearImagenes fecha={avance.fecha} listo={porId.difusion?.estado === 'hecho'} alCrear={cargar}
+          alVerMaterial={() => { setModal(null); ir('contenido') }} />}
       </Modal>
 
       <Modal abierto={modal === 'calendario'} titulo={VERSION_CORTA ? 'Calendario: fecha y tema' : 'Calendario y equipo'} ancho="medio" alCerrar={() => setModal(null)}>

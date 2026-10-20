@@ -2,6 +2,20 @@ import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { fechaHora } from '../util.js'
 
+/** Sección plegable (Gonza, 2026-10-20): solo se ve su título; al pulsarlo se despliega su contenido. */
+function Desplegable({ titulo, children }) {
+  const [abierto, setAbierto] = useState(false)
+  const id = `conf-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  return (
+    <section className={`tarjeta desplegable ${abierto ? 'abierto' : ''}`}>
+      <button type="button" className="desplegable-cabeza" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto((a) => !a)}>
+        <span>{titulo}</span><span className="paso-flecha" aria-hidden="true">{abierto ? '▴' : '▾'}</span>
+      </button>
+      {abierto && <div className="desplegable-cuerpo" id={id}>{children}</div>}
+    </section>
+  )
+}
+
 export default function Configuracion({ usuario }) {
   const [estado, setEstado] = useState(null)
   useEffect(() => { api('/api/estado').then(setEstado).catch(() => setEstado(null)) }, [])
@@ -10,8 +24,7 @@ export default function Configuracion({ usuario }) {
     <>
       <Equipo />
       <Conexiones estado={estado} />
-      <section className="tarjeta">
-        <span className="etiqueta">Tu cuenta</span>
+      <Desplegable titulo="Tu cuenta">
         <dl className="dl">
           <dt>Nombre</dt><dd>{usuario.nombre}</dd>
           <dt>Usuario</dt><dd>{usuario.usuario}</dd>
@@ -19,16 +32,15 @@ export default function Configuracion({ usuario }) {
         <p className="chico-texto" style={{ marginTop: 14 }}>
           Para cambiar tu contraseña, en la PC del sistema ejecuta: <code>flask --app app cambiar-password {usuario.usuario}</code>
         </p>
-      </section>
-      <section className="tarjeta">
-        <span className="etiqueta">Seguridad</span>
+      </Desplegable>
+      <Desplegable titulo="Seguridad">
         <ul className="lista">
           <li className="item"><div><b>Sesión cifrada</b><span className="muted">Se cierra sola a las 8 horas.</span></div><span className="pill verde">activo</span></li>
           <li className="item"><div><b>Bloqueo por intentos</b><span className="muted">15 minutos tras 5 intentos fallidos.</span></div><span className="pill verde">activo</span></li>
           <li className="item"><div><b>Nada se publica sin aprobación</b><span className="muted">El agente de publicación solo toca lo aprobado.</span></div><span className="pill verde">activo</span></li>
           <li className="item"><div><b>Acceso remoto por Tailscale</b><span className="muted">Solo la PC del aprobador puede entrar desde fuera.</span></div><span className="pill gris">según .env</span></li>
         </ul>
-      </section>
+      </Desplegable>
     </>
   )
 }
@@ -98,8 +110,7 @@ function Equipo() {
   }
 
   return (
-    <section className="tarjeta">
-      <span className="etiqueta">Equipo</span>
+    <Desplegable titulo="Equipo">
       <p className="chico-texto" style={{ marginBottom: 12 }}>
         Los integrantes no tienen cuenta: solo su nombre y correo para mandarles la invitación. Cada domingo a las
         6 pm se reparten solos los turnos de la semana, a quien lleva menos turnos. Quien está en pausa no recibe
@@ -164,15 +175,14 @@ function Equipo() {
           <button className="btn suave" type="button" disabled={ocupado || !gente?.length} onClick={repartir}>Repartir turnos ahora</button>
         </div>
       </form>
-    </section>
+    </Desplegable>
   )
 }
 
 function Conexiones({ estado }) {
   const agentes = estado?.agentes ?? []
   return (
-    <section className="tarjeta">
-      <span className="etiqueta">Agentes y conexiones</span>
+    <Desplegable titulo="Agentes y conexiones">
       <ul className="lista">
         <li className="item">
           <div><b>Ventana de agentes</b><span className="muted">{estado?.worker_activo ? 'Trabajando en la PC del sistema.' : 'Apagada: abre iniciar.bat en la PC del sistema.'}</span></div>
@@ -202,6 +212,6 @@ function Conexiones({ estado }) {
           <span className={`pill ${estado?.meta ? 'verde' : 'gris'}`}>{estado?.meta ? 'automático' : 'manual'}</span>
         </li>
       </ul>
-    </section>
+    </Desplegable>
   )
 }

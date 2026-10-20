@@ -15,7 +15,7 @@ import { VERSION_CORTA } from './version.js'
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
   { id: 'contenido', nombre: VERSION_CORTA ? 'Material' : 'Contenido' },
-  { id: 'evento', nombre: 'Evento' },
+  { id: 'evento', nombre: 'Evento', oculta: VERSION_CORTA },  // versión corta: se quitó (Gonza, 2026-10-20)
   { id: 'estadisticas', nombre: 'Estadísticas', corto: 'Datos', oculta: VERSION_CORTA },
   { id: 'configuracion', nombre: 'Configuración', corto: 'Ajustes' },
 ].filter((p) => !p.oculta)
@@ -68,15 +68,17 @@ export default function App() {
     <>
       <header className="cabecera">
         <div className="cab-fila">
-          <div className="marca">† Cristocéntricos<small>· sistema del equipo</small></div>
+          <div className="marca">
+            <img src="/marca/logo-cristocentricos.png" alt="Cristocéntricos" width="119" height="44" />
+            <small>sistema del equipo</small>
+          </div>
           <div className="acciones">
             <div className="tema" role="group" aria-label="Tema">
               <button aria-pressed={tema === 'light'} onClick={() => elegirTema('light')}><Sol /><span>Claro</span></button>
-              <button aria-pressed={tema === 'dark'} onClick={() => elegirTema('dark')}><Luna /><span>Oscuro</span></button>
+              <button aria-pressed={tema === 'dark'} onClick={() => elegirTema('dark')} title="Tema oscuro con oro"><Luna /><span>Oro</span></button>
             </div>
             <button className="btn suave chico" onClick={() => { ir('inicio'); setDiagrama(true) }}
               title="Muestra en grande cómo funciona el proceso del evento">Diagrama</button>
-            <button className="btn suave chico" onClick={() => setIdeas(true)} title="Guarda una idea escrita o por voz">Ideas</button>
             <button className="btn suave chico" onClick={salir}>Salir</button>
           </div>
         </div>

@@ -161,3 +161,29 @@
 @media (prefers-reduced-motion:reduce){
   .estado.activo::before,.avance-pista span{animation:none;transition:none}
 }
+
+/* Vista de los pasos: tarjetas o lista (la elige cada quien; se recuerda en el navegador) */
+.vista-pasos{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:4px}
+.vista-botones{display:inline-flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.vista-botones button{min-height:36px;padding:0 14px;border:1.5px solid transparent;border-radius:11px;background:transparent;
+  color:var(--muted);font:700 .85rem var(--f-body);cursor:pointer}
+.vista-botones button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-strong);box-shadow:var(--brillo)}
+.pasos-tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:12px;align-items:start}
+.paso-tarjeta,.pasos-lista .paso{scroll-margin-top:140px}
+.paso-tarjeta{display:flex;flex-direction:column;gap:8px;padding:18px;border-top:3px solid var(--paso,var(--line))}
+.paso-tarjeta h3{font-size:1.05rem}
+.paso-tarjeta.es-actual{border-color:var(--paso);box-shadow:0 0 0 1px var(--paso),var(--brillo)}
+.paso-tarjeta.a-hecho,.paso-tarjeta.a-omitido{opacity:.78}
+.pt-cabeza{display:flex;align-items:center;gap:10px}
+.pt-texto{flex:1;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.pt-botones{align-items:center;margin-top:auto}
+@media (max-width:560px){.pt-botones .btn{flex:1 1 auto}}
+
+/* Ventana «Agregar guion» */
+.guion-soltar{display:grid;gap:8px;padding:12px;border:1.5px dashed var(--line);border-radius:var(--r-item);transition:border-color .2s,background .2s}
+.guion-soltar.encima{border-color:var(--accent);background:var(--accent-soft)}
+.guion-opciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.guion-evento textarea{min-height:min(52vh,420px);font-size:1.02rem}
+.guion-sin-tema{display:grid;gap:12px;justify-items:start}
+.crear-imagenes{display:grid;gap:12px}
+.sr-solo{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

@@ -80,6 +80,8 @@ export default function Flujo({ pasos, nodosVivo, avance, actual, grande = false
   }
 
   const explicado = recorrido === null ? null : pasos[recorrido]
+  // Color propio de cada paso (--p1 … --p7 en tokens.css) para que se note el paso de uno a otro.
+  const colorDe = (idPaso) => (idPaso && indice[idPaso] !== undefined ? { '--paso': `var(--p${indice[idPaso] + 1})` } : undefined)
 
   return (
     <div className={`flujo-caja ${grande ? 'grande' : ''}`}>
@@ -92,14 +94,14 @@ export default function Flujo({ pasos, nodosVivo, avance, actual, grande = false
       <div className={`lienzo ${recorrido === null ? 'modo-avance' : 'modo-recorrido'}`} tabIndex={grande ? 0 : undefined}
         aria-label={grande ? 'Lienzo del flujo. En pantallas angostas se desliza hacia los lados.' : undefined}>
         <svg className="lienzo-svg" viewBox={`0 0 ${LIENZO.ancho} ${LIENZO.alto}`} role="img"
-          aria-label="Flujo del evento en 11 pasos: turnos, preparación, evento en vivo, grabación, reels, carrusel, bandeja, publicación, redes, hoja de registro y reporte semanal.">
+          aria-label="Flujo del evento en 7 pasos: tema y fecha, guion, imágenes, revisión técnica, grabación, reels con estilo e ideas.">
           <Iconos />
           {CONEXIONES.map((c) => {
             const f = fase(pasoDeCx[c.id])
             const g = GEO[c.id]
             const ancho = c.l ? c.l.length * 6.3 + 18 : 0
             return (
-              <g key={c.id} className={`cx ${c.fija ? 'fija' : ''} ${f === 'hecho' || f === 'omitido' ? 'hecha' : ''} ${f === 'actual' ? 'viva' : ''}`}>
+              <g key={c.id} style={colorDe(pasoDeCx[c.id])} className={`cx ${c.fija ? 'fija' : ''} ${f === 'hecho' || f === 'omitido' ? 'hecha' : ''} ${f === 'actual' ? 'viva' : ''}`}>
                 <path className="l" d={g.d} />
                 <polygon points={g.punta} />
                 <circle className="asa" cx={g.a[0]} cy={g.a[1]} r="5" />
@@ -123,7 +125,7 @@ export default function Flujo({ pasos, nodosVivo, avance, actual, grande = false
             const paso = pasos[indice[idPaso]]
             const texto = f === 'hecho' ? 'Hecho' : f === 'omitido' ? 'Omitido' : f === 'actual' ? 'Paso actual' : 'Pendiente'
             return (
-              <g key={n.id} className={`nodo d-${n.k} f-${f || 'ninguna'} ${error ? 'v-error' : ''}`} transform={`translate(${n.x},${n.y})`}
+              <g key={n.id} style={colorDe(idPaso)} className={`nodo d-${n.k} f-${f || 'ninguna'} ${error ? 'v-error' : ''}`} transform={`translate(${n.x},${n.y})`}
                 tabIndex={0} role="button" aria-label={`Paso ${paso?.numero}: ${n.t}. ${texto}${error ? `. Error: ${vivo.corto}` : ''}`}
                 onClick={() => idPaso && alElegirPaso?.(idPaso)}
                 onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && idPaso) { e.preventDefault(); alElegirPaso?.(idPaso) } }}>
@@ -146,7 +148,7 @@ export default function Flujo({ pasos, nodosVivo, avance, actual, grande = false
       </div>
 
       {explicado ? (
-        <div className="recorrido-panel" aria-live="polite">
+        <div className="recorrido-panel" aria-live="polite" style={colorDe(explicado.id)}>
           <span className={`quien q-${explicado.q}`}>Paso {recorrido + 1} de {pasos.length} · {QUIEN[explicado.q]}</span>
           <h3>{explicado.t}</h3>
           <p>{explicado.x}</p>

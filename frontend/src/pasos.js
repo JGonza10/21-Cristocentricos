@@ -9,24 +9,24 @@ import { fechaDeClave, fechaHora } from './util.js'
 
 // k: disp = disparador · agente · humano = tú decides · plata = archivo o lo subes tú · hab = Claude te ayuda
 export const NODOS = [
-  { id: 'n-cal', x: 70, y: 170, k: 'humano', i: 'cal', t: 'Calendario', s: 'Fecha y tema' },
-  { id: 's-guion', x: 220, y: 170, k: 'hab', i: 'pen', t: 'Guion', s: 'Si no hay, con Claude', r: 28 },
-  { id: 'n-dif', x: 220, y: 410, k: 'agente', i: 'img', t: 'Difusión', s: '5 imágenes a Material' },
-  { id: 's-lista', x: 375, y: 170, k: 'humano', i: 'check', t: 'Revisión técnica', s: 'Audio, cámara, celular', r: 28 },
-  { id: 'n-vivo', x: 530, y: 170, k: 'disp', i: 'bolt', t: 'Evento en vivo', s: 'Lun y vie · 10 a 11 am' },
-  { id: 'n-sy', x: 720, y: 60, k: 'plata', i: 'tv', t: 'StreamYard', s: 'Con cintillas: TV y redes', r: 30 },
-  { id: 'n-cel', x: 720, y: 280, k: 'plata', i: 'folder', t: 'Celular', s: 'Limpio: a grabaciones/', r: 30 },
-  { id: 's-estilo', x: 720, y: 440, k: 'plata', i: 'folder', t: 'Estilo del cliente', s: 'Referencia y herramientas', r: 28 },
-  { id: 'n-reels', x: 900, y: 280, k: 'agente', i: 'film', t: 'Reels con estilo', s: '5 reels editados' },
-  { id: 'n-mat', x: 1070, y: 280, k: 'plata', i: 'folder', t: 'Material', s: 'Descargas y subes', r: 30 },
-  { id: 's-ideas', x: 1215, y: 280, k: 'hab', i: 'pen', t: 'Ideas', s: 'Último paso', r: 28 },
+  { id: 'n-cal', x: 70, y: 170, k: 'humano', i: 'cal', t: 'Tema y fecha', s: 'En el calendario' },
+  { id: 's-guion', x: 225, y: 170, k: 'hab', i: 'pen', t: 'Guion', s: 'Escrito o archivo', r: 30 },
+  { id: 'n-dif', x: 380, y: 170, k: 'agente', i: 'img', t: 'Imágenes', s: '5 para redes' },
+  { id: 's-lista', x: 535, y: 170, k: 'humano', i: 'check', t: 'Revisión técnica', s: 'Audio, cámara, celular', r: 30 },
+  { id: 'n-vivo', x: 690, y: 170, k: 'disp', i: 'bolt', t: 'Evento en vivo', s: 'Lun y vie · 10 a 11 am' },
+  { id: 'n-sy', x: 870, y: 60, k: 'plata', i: 'tv', t: 'StreamYard', s: 'Con cintillas: TV y redes', r: 30 },
+  { id: 'n-cel', x: 870, y: 280, k: 'plata', i: 'folder', t: 'Celular', s: 'Limpio: a grabaciones/', r: 30 },
+  { id: 's-estilo', x: 870, y: 440, k: 'plata', i: 'folder', t: 'Estilo del cliente', s: 'Referencia y herramientas', r: 28 },
+  { id: 'n-reels', x: 1045, y: 280, k: 'agente', i: 'film', t: 'Reels con estilo', s: '5 reels editados' },
+  { id: 'n-mat', x: 1205, y: 280, k: 'plata', i: 'folder', t: 'Material', s: 'Descargas y subes', r: 30 },
+  { id: 's-ideas', x: 1350, y: 280, k: 'hab', i: 'pen', t: 'Ideas', s: 'Último paso', r: 28 },
 ]
-export const LIENZO = { ancho: 1300, alto: 540 }
+export const LIENZO = { ancho: 1430, alto: 520 }
 
 export const CONEXIONES = [
   { id: 'c1', a: 'n-cal', b: 's-guion' },
-  { id: 'c2', a: 'n-cal', b: 'n-dif', l: 'Al guardar el tema' },
-  { id: 'c3', a: 's-guion', b: 's-lista' },
+  { id: 'c2', a: 's-guion', b: 'n-dif' },
+  { id: 'c3', a: 'n-dif', b: 's-lista' },
   { id: 'c4', a: 's-lista', b: 'n-vivo' },
   { id: 'c5', a: 'n-vivo', b: 'n-sy' },
   { id: 'c6', a: 'n-vivo', b: 'n-cel' },
@@ -38,13 +38,13 @@ export const CONEXIONES = [
 
 // q: tu = lo haces tú · solo = se hace solo · hab = Claude te ayuda
 export const PASOS = [
-  { id: 'tema', n: ['n-cal'], v: [], q: 'tu', t: 'Calendario: fecha y tema',
-    x: 'En el calendario se pone la cita (el evento) y el tema que se va a grabar, y se sube la imagen del tema (la que va al centro de los reels, como el Santo Rostro). Lo ideal: los próximos 2 eventos siempre con tema.' },
-  { id: 'guion', n: ['s-guion'], v: ['c1'], q: 'hab', t: 'Guion del evento (solo si lo hay)',
-    x: 'Si ya hay guion, pégalo en el tema y guarda. Si no lo hay, «Preparar guion con Claude» copia las instrucciones para que Claude busque el tema en fuentes de la Iglesia (Biblia, Catecismo, Magisterio, santos) con sus citas, y arme el guion. Pégalo de vuelta y guarda. Si no hace falta guion, omite el paso.' },
-  { id: 'difusion', n: ['n-dif'], v: ['c2'], q: 'solo', t: '5 imágenes de difusión',
-    x: 'En cuanto el tema se guarda en el calendario, el sistema arma solo 5 imágenes para anunciar el evento, con su texto. Quedan en Material para descargarlas y subirlas. Si cambias el tema, sale una versión nueva.' },
-  { id: 'revision', n: ['s-lista'], v: ['c3'], q: 'tu', t: 'Revisión técnica del día',
+  { id: 'tema', n: ['n-cal'], v: [], q: 'tu', t: 'Tema y fecha',
+    x: 'En el calendario se elige la fecha y se escribe el tema que se va a grabar, con la imagen del tema (la que va al centro de los reels, como el Santo Rostro). Al guardarlo se abre solo el paso del guion. Lo ideal: los próximos 2 eventos siempre con tema.' },
+  { id: 'guion', n: ['s-guion'], v: ['c1'], q: 'hab', t: 'Agregar guion',
+    x: 'Se abre una ventana para escribir o pegar el guion, o cargarlo desde un archivo (.docx, .pdf o .txt). Si no lo hay, «Preparar guion con Claude» copia las instrucciones para que Claude busque el tema en fuentes de la Iglesia (Biblia, Catecismo, Magisterio, santos) con sus citas, y arme el guion. Pégalo de vuelta y guarda. Si no hace falta guion, omite el paso.' },
+  { id: 'difusion', n: ['n-dif'], v: ['c2'], q: 'solo', t: 'Crear imágenes',
+    x: 'Las 5 imágenes de difusión del tema para redes sociales. «Crear imágenes» las hace al momento (y también salen solas al guardar el tema). Quedan en Material para descargarlas y subirlas; si cambias el tema, «Otra versión» las rehace.' },
+  { id: 'revision', n: ['s-lista'], v: ['c3'], q: 'tu', t: 'Revisión técnica',
     x: 'Antes de transmitir se palomea la lista: audio, cámara y luz, internet, StreamYard, celular grabando la segunda toma, guion e intenciones a la mano y reloj.' },
   { id: 'grabacion', n: ['n-vivo', 'n-sy', 'n-cel'], v: ['c4', 'c5', 'c6', 'c7'], q: 'tu', t: 'Grabación: StreamYard y celular',
     x: 'StreamYard guarda el video como sale del stream (con cintillas): ese va al canal de TV y a la red social indicada. El celular graba la segunda toma limpia, sin cintillas: copia ese video a la carpeta grabaciones/ (o súbelo con «Subir grabación»). De ahí salen los reels.' },

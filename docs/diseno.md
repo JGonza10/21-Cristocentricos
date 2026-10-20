@@ -17,16 +17,18 @@ Concepto: panel lavanda claro; el morado es el único color de acción; la pesta
 --ok:#2b7a4b; --ok-soft:#e1f1e7; --warn:#8a5d00; --warn-soft:#fbf0d3; --off:#a39bab;
 ```
 
-## Colores — oscuro
+## Colores — Oro (antes "Oscuro", 2026-10-20)
+Colores de Kestrel (azul noche) con el oro del logo en lugar del naranja. Fuente única: `frontend/src/styles/tokens.css`.
 ```css
---bg:#15111c; --surface:#1e1828; --surface-2:#241d30;
---ink:#f1ecf8; --ink-2:#d2c7e0; --muted:#b3a8c2; --muted-2:#9d92ac; --line:#3a3048;
---accent:#b48cf0; --accent-strong:#c9a8f5; --accent-soft:#2e2442; --on-accent:#1a1225;
---grad-tab:linear-gradient(90deg,#8b55d0,#b45cc4);
---grad-hero:linear-gradient(135deg,#221a31,#211c38 55%,#1f2140);
---ok:#78c995; --ok-soft:#1b3326; --warn:#e6b84e; --warn-soft:#3a2f12; --off:#6e6479;
+--bg:#05080e; --surface:#0c1420; --surface-2:#111b29; --line:#1f2b3c;
+--ink:#e6edf6; --muted:#8c9db2;
+--accent:#e2b25c; --accent-strong:#f2cd85; --on-accent:#05080e;   /* oro */
+--grad-tab: oro #9c6b24 → #e9c27a → #a8772b (la pestaña activa lleva letra oscura)
+--grad-titulo: degradado dorado en el título del anuncio, con Cormorant Garamond (la serif del logo)
+--filete: línea dorada bajo el menú · --brillo: halo dorado en lo activo
 ```
 Se aplica con `@media (prefers-color-scheme:dark){:root:not([data-theme="light"])}` y `:root[data-theme="dark"]`.
+Colores de los 7 pasos en el diagrama y las tarjetas: `--p1` … `--p7` (cada paso su contorno).
 
 ## Imágenes para redes
 Blanco y vino: `#ffffff`, `#fbf9f7`, vino `#7a1c2e`, vino suave `#f3e4e7`, texto `#3a1420`, oro `#8f6b10`. Títulos en **Spectral** 700, texto Public Sans (TTF en `assets/fuentes/`). Carrusel 1080×1350.
@@ -36,10 +38,10 @@ Morado = acciones · degradado = pestaña activa y sello del login · verde = fu
 En gráficas: paleta viva con degradados, nada de café o mostaza oscura.
 
 ## Componentes
-- Botón primario `--accent`, radio 12 px, alto ≥ 44 px; botón suave `--accent-soft`.
+- Botones de color **solo de contorno** (regla de Gonza): primario con borde `--accent`, suave con borde `--line`; radio 12 px, alto ≥ 44 px.
 - Tarjeta `--surface`, borde `--line`, radio 20 px, padding 22 px (18 en celular).
 - Fila: `--surface-2`, radio 14 px; la de hoy con barra morada a la izquierda.
 - Ancho máximo 940 px, margen 16 px, cuerpo 16 px/1.55.
 
 ## Pantallas
-Cabecera fija (selector Claro/Oscuro, Diagrama, Salir) · pestañas Inicio · Contenido · Evento · Estadísticas · Configuración. Inicio muestra solo el evento de hoy o los próximos. Ventanas con `<dialog>` (`componentes/Modal.jsx`).
+Cabecera fija con el logo (selector Claro/Oro, Diagrama, Salir) · pestañas Inicio · Material · Configuración (versión corta). Inicio: anuncio del evento con la Virgen, pasos en **tarjetas o lista** (cada quien elige), al cumplirse un paso se abre solo el siguiente (Guion y Crear imágenes en su ventana). Diagrama a pantalla completa. Material empieza con «Ver guion en Prompter». Configuración: secciones plegables. Imágenes de marca en `frontend/public/marca/`. Inicio muestra solo el evento de hoy o los próximos. Ventanas con `<dialog>` (`componentes/Modal.jsx`).

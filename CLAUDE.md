@@ -2,13 +2,13 @@
 
 ## Qué es
 
-Sistema del equipo Cristocéntricos. **Versión corta (v2.0, 2026-10-19):** proceso guiado de 7 pasos por evento (lunes y viernes, 10–11 am CDMX): calendario con tema → guion (si no hay, Claude busca en fuentes de la Iglesia) → 5 imágenes de difusión al guardar el tema → revisión técnica (sin OBS; celular graba la segunda toma) → grabación (StreamYard con cintillas va a TV/redes; video limpio del celular a `grabaciones/`) → 5 reels editados con el **estilo del cliente** (`estilo_cliente/`) → ideas.
+Sistema del equipo Cristocéntricos. **Versión corta (v2.0, 2026-10-19):** proceso guiado de 7 pasos por evento (lunes y viernes, 10–11 am CDMX): tema y fecha en el calendario → agregar guion (escrito, pegado o desde .docx/.pdf/.txt; si no hay, Claude busca en fuentes de la Iglesia) → crear las 5 imágenes de difusión → revisión técnica (sin OBS; celular graba la segunda toma) → grabación (StreamYard con cintillas va a TV/redes; video limpio del celular a `grabaciones/`) → 5 reels editados con el **estilo del cliente** (`estilo_cliente/`) → ideas.
 
 Ocultos, no borrados (`VERSION_CORTA=0` en `.env` + `frontend/src/version.js`): turnos, bandeja de aprobación, publicación, reporte semanal, estadísticas, OBS, reel promocional y carrusel de escenas. La v1.0 completa está en `versiones/Cristocentricos v.1.0.zip`.
 
 - Corre local en la PC de Gonza; el aprobador entra por **Tailscale** (`tailscale serve --bg 5021`), sin abrir puertos.
 - Repo: https://github.com/JGonza10/21-Cristocentricos
-- Diseño (tokens, colores, componentes): [docs/diseno.md](docs/diseno.md).
+- Diseño (tokens, colores, componentes; temas Claro y Oro): [docs/diseno.md](docs/diseno.md). Al cumplirse un paso se abre solo el siguiente; pasos en tarjetas o lista; Prompter en Material.
 
 ## Comandos (PowerShell)
 

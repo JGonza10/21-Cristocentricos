@@ -23,9 +23,11 @@ DIAS_ATRAS = 60  # la bitácora revisa hasta 60 días atrás por si el worker es
 # Cómo se cumple cada paso (lo ve la persona en la tarjeta). Versión corta: 7 pasos.
 COMO = {
     "tema": "Se marca solo cuando el evento tiene tema guardado en el calendario.",
-    "guion": "Se marca solo cuando el guion está guardado. Si no hay guion, «Preparar guion con Claude» "
-             "copia las instrucciones para buscar el tema en fuentes de la Iglesia; pega el resultado y guarda.",
-    "difusion": "Se marca solo cuando las 5 imágenes de difusión están listas (salen en cuanto se guarda el tema).",
+    "guion": "Se marca solo cuando el guion está guardado: escríbelo, pégalo o cárgalo desde un archivo (.docx, .pdf, "
+             ".txt). Si no hay guion, «Preparar guion con Claude» copia las instrucciones para buscar el tema en "
+             "fuentes de la Iglesia; pega el resultado y guarda.",
+    "difusion": "Se marca solo cuando las 5 imágenes para redes del tema están listas en Material ("
+                "«Crear imágenes» las hace al momento; también salen solas al guardar el tema).",
     "revision": "Se marca solo cuando palomeas toda la revisión técnica del día.",
     "grabacion": "Se marca solo cuando llega a grabaciones/ el video limpio del celular (o se sube desde la app).",
     "reels": "Se marca solo cuando los 5 reels editados con el estilo del cliente están listos en Material.",

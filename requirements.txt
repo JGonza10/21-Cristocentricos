@@ -10,7 +10,9 @@ tzdata==2026.5
 # Agentes (fases 3 a 8)
 APScheduler==3.11.0
 watchdog==6.0.0
-Pillow==12.3.0
+Pillow==13.0.0
+pypdf==6.21.1
+defusedxml==0.7.1
 faster-whisper==1.2.1
 google-api-python-client==2.201.0
 google-auth==2.62.0
