@@ -22,4 +22,4 @@ requests==2.34.2
 
 # Pruebas y seguridad
 pytest==9.0.3
-pip-audit==2.9.0
+pip-audit==2.10.1
