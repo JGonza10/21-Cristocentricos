@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { fechaHora } from '../util.js'
+import CambiarPassword from '../componentes/CambiarPassword.jsx'
 
 /** Sección plegable (Gonza, 2026-10-20): solo se ve su título; al pulsarlo se despliega su contenido. */
 function Desplegable({ titulo, children }) {
@@ -29,16 +30,16 @@ export default function Configuracion({ usuario }) {
           <dt>Nombre</dt><dd>{usuario.nombre}</dd>
           <dt>Usuario</dt><dd>{usuario.usuario}</dd>
         </dl>
-        <p className="chico-texto" style={{ marginTop: 14 }}>
-          Para cambiar tu contraseña, en la PC del sistema ejecuta: <code>flask --app app cambiar-password {usuario.usuario}</code>
-        </p>
+        <h3 style={{ marginTop: 18 }}>Cambiar contraseña</h3>
+        <CambiarPassword />
       </Desplegable>
       <Desplegable titulo="Seguridad">
         <ul className="lista">
           <li className="item"><div><b>Sesión cifrada</b><span className="muted">Se cierra sola a las 8 horas.</span></div><span className="pill verde">activo</span></li>
           <li className="item"><div><b>Bloqueo por intentos</b><span className="muted">15 minutos tras 5 intentos fallidos.</span></div><span className="pill verde">activo</span></li>
-          <li className="item"><div><b>Nada se publica sin aprobación</b><span className="muted">El agente de publicación solo toca lo aprobado.</span></div><span className="pill verde">activo</span></li>
-          <li className="item"><div><b>Acceso remoto por Tailscale</b><span className="muted">Solo la PC del aprobador puede entrar desde fuera.</span></div><span className="pill gris">según .env</span></li>
+          <li className="item"><div><b>Nada se publica solo</b><span className="muted">El material se descarga y se sube a mano a cada red.</span></div><span className="pill verde">activo</span></li>
+          <li className="item"><div><b>Cuentas nuevas con contraseña temporal</b><span className="muted">Se cambia la primera vez que se entra.</span></div><span className="pill verde">activo</span></li>
+          <li className="item"><div><b>Acceso remoto por Tailscale</b><span className="muted">Solo las computadoras invitadas pueden entrar desde fuera.</span></div><span className="pill gris">según .env</span></li>
         </ul>
       </Desplegable>
     </>
@@ -49,7 +50,6 @@ function Equipo() {
   const [gente, setGente] = useState(null)
   const [nombre, setNombre] = useState('')
   const [correo, setCorreo] = useState('')
-  const [dirige, setDirige] = useState(true)
   const [editando, setEditando] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
@@ -74,9 +74,9 @@ function Equipo() {
   function agregar(ev) {
     ev.preventDefault()
     accion(async () => {
-      const d = await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo, puede_dirigir: dirige } })
+      const d = await api('/api/equipo', { metodo: 'POST', datos: { nombre, correo } })
       setGente((g) => [...g, d.integrante].sort((a, b) => b.activo - a.activo || a.nombre.localeCompare(b.nombre)))
-      setNombre(''); setCorreo(''); setDirige(true)
+      setNombre(''); setCorreo('')
     }, 'Integrante agregado.')
   }
 
@@ -90,31 +90,23 @@ function Equipo() {
 
   function pausar(i) {
     cambiar(i, { activo: !i.activo }, i.activo
-      ? `${i.nombre} quedó en pausa: no recibe turnos, invitaciones ni correos.`
-      : `${i.nombre} vuelve a recibir turnos e invitaciones.`)
+      ? `${i.nombre} quedó en pausa: no recibe el aviso del tema.`
+      : `${i.nombre} vuelve a recibir el aviso del tema.`)
   }
 
   function baja(i) {
-    if (!window.confirm(`¿Borrar a ${i.nombre}? Se borran su nombre, su correo y sus turnos futuros. Si solo quieres que no reciba correos por un tiempo, usa Pausar.`)) return
+    if (!window.confirm(`¿Borrar a ${i.nombre}? Se borran su nombre y su correo. Si solo quieres que no reciba correos por un tiempo, usa Pausar.`)) return
     accion(async () => {
       await api(`/api/equipo/${i.id}`, { metodo: 'DELETE' })
       setGente((g) => g.filter((x) => x.id !== i.id))
     }, 'Borrado. Sus datos personales se eliminaron.')
   }
 
-  function repartir() {
-    accion(async () => {
-      const d = await api('/api/turnos/repartir', { metodo: 'POST' })
-      setMensaje(d.asignados ? `Listo: ${d.asignados} turnos asignados en las próximas 2 semanas.` : 'Las próximas 2 semanas ya tienen a todos asignados.')
-    })
-  }
-
   return (
     <Desplegable titulo="Equipo">
       <p className="chico-texto" style={{ marginBottom: 12 }}>
-        Los integrantes no tienen cuenta: solo su nombre y correo para mandarles la invitación. Cada domingo a las
-        6 pm se reparten solos los turnos de la semana, a quien lleva menos turnos. Quien está en pausa no recibe
-        turnos, invitaciones ni correos: úsalo para hacer pruebas sin molestar a nadie.
+        Los integrantes no tienen cuenta: solo su nombre y correo para mandarles por correo el tema de cada evento en
+        cuanto se guarda. Quien está en pausa no recibe correos: úsalo para hacer pruebas sin molestar a nadie.
       </p>
       {gente === null && !error && <p className="vacio">Cargando…</p>}
       {gente?.length === 0 && <p className="vacio">Todavía no hay integrantes.</p>}
@@ -137,13 +129,10 @@ function Equipo() {
                 <>
                   <div>
                     <b>{i.nombre}{!i.activo && <span className="pill gris">en pausa</span>}</b>
-                    <span className="muted partir">{i.correo} · {i.puede_dirigir ? 'dirige y apoya' : 'solo apoya'}{!i.activo && ' · sin turnos ni correos'}</span>
+                    <span className="muted partir">{i.correo}{!i.activo && ' · no recibe correos'}</span>
                   </div>
                   <div className="botones-fila">
                     <button className="btn suave chico" disabled={ocupado} onClick={() => setEditando({ id: i.id, nombre: i.nombre, correo: i.correo })}>Modificar</button>
-                    <button className="btn suave chico" disabled={ocupado} onClick={() => cambiar(i, { puede_dirigir: !i.puede_dirigir })}>
-                      {i.puede_dirigir ? 'Solo apoya' : 'Puede dirigir'}
-                    </button>
                     <button className="btn suave chico" disabled={ocupado} onClick={() => pausar(i)}>
                       {i.activo ? 'Pausar' : 'Reactivar'}
                     </button>
@@ -163,16 +152,14 @@ function Equipo() {
           <input id="eq-nombre" value={nombre} maxLength={80} required autoComplete="off" onChange={(e) => setNombre(e.target.value)} />
         </div>
         <div className="campo">
-          <label htmlFor="eq-correo">Correo (de preferencia Gmail, para Google Calendar)</label>
+          <label htmlFor="eq-correo">Correo</label>
           <input id="eq-correo" type="email" value={correo} maxLength={120} required autoComplete="off" inputMode="email"
             onChange={(e) => setCorreo(e.target.value)} />
         </div>
-        <label className="casilla"><input type="checkbox" checked={dirige} onChange={(e) => setDirige(e.target.checked)} /> Puede dirigir el evento</label>
         {error && <p className="error" role="alert">{error}</p>}
         {mensaje && <p className="chico-texto" role="status">{mensaje}</p>}
         <div className="botones">
           <button className="btn" type="submit" disabled={ocupado}>Agregar</button>
-          <button className="btn suave" type="button" disabled={ocupado || !gente?.length} onClick={repartir}>Repartir turnos ahora</button>
         </div>
       </form>
     </Desplegable>
@@ -199,17 +186,10 @@ function Conexiones({ estado }) {
         ))}
         <li className="item">
           <div>
-            <b>Google (YouTube y Calendar)</b>
-            <span className="muted">{estado?.google ? 'Autorizado: los reels suben en privado a YouTube y se mandan las invitaciones.' : <>Sin autorizar. En la PC del sistema: <code>flask --app app google-autorizar</code> (ver README).</>}</span>
+            <b>Gmail (aviso del tema al equipo)</b>
+            <span className="muted">{estado?.google ? 'Autorizado: al guardar un tema, al equipo le llega un correo.' : <>Sin autorizar: no se mandan correos. En la PC del sistema: <code>flask --app app google-autorizar</code> (ver README).</>}</span>
           </div>
           <span className={`pill ${estado?.google ? 'verde' : 'ambar'}`}>{estado?.google ? 'conectado' : 'pendiente'}</span>
-        </li>
-        <li className="item">
-          <div>
-            <b>Meta (Facebook e Instagram)</b>
-            <span className="muted">{estado?.meta ? 'Publicación automática activa para Facebook y reels de Instagram.' : 'Manual: se preparan carpetas en subir_manual/. Se activa con META_AUTO=1 en el .env.'}</span>
-          </div>
-          <span className={`pill ${estado?.meta ? 'verde' : 'gris'}`}>{estado?.meta ? 'automático' : 'manual'}</span>
         </li>
       </ul>
     </Desplegable>

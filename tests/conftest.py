@@ -16,13 +16,15 @@ def app(tmp_path):
         "SQLALCHEMY_DATABASE_URI": "sqlite://",
         "SESSION_COOKIE_SECURE": False,
         "BCRYPT_ROUNDS": 4,
-        "TAILSCALE": False,  # no depender del .env real; la prueba que lo necesita lo activa
+        "TAILSCALE": False,
+        "MODO": "local",  # no depender del .env real; la prueba que lo necesita lo activa
         "LOG_DIR": tmp_path / "logs",
         "FRONTEND_DIST": tmp_path / "sin-frontend",
         "PAQUETES_DIR": tmp_path / "paquetes",
         "GRABACIONES_DIR": tmp_path / "grabaciones",
         "SECRETOS_DIR": tmp_path / "secretos",
-        "ESTILO_DIR": tmp_path / "estilo_cliente",   # sin estilo.json = look de la v1.0
+        "CUENTAS_NUEVAS": tmp_path / "cuentas_nuevas.json",
+        "ESTILO_DIR": tmp_path / "estilo_cliente",   # sin estilo.json = receta por defecto
     })
     with app.app_context():
         db.session.add(Usuario(usuario="gonza", nombre="Gonza", hash_password=hashear(PASSWORD)))

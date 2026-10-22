@@ -114,13 +114,37 @@ def usuario_actual() -> Usuario | None:
     return u
 
 
+def solo_en_laptop(vista):
+    """Para rutas que manejan videos, audio o archivos pesados: en la nube (MODO=nube) no se hacen.
+
+    Esos archivos viven solo en la laptop (grabaciones/, paquetes/, estilo_cliente/); la nube
+    solo vigila el avance. Va debajo de @login_requerido.
+    """
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if current_app.config.get("EN_NUBE"):
+            return jsonify(error="Esto se hace en la laptop: los videos y archivos no se suben a internet.",
+                           solo_laptop=True), 409
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+# Lo único que puede hacer quien tiene contraseña temporal: ver quién es, cambiarla o salir.
+PERMITIDO_CON_TEMPORAL = {"auth.yo", "auth.cambiar_password", "auth.logout"}
+
+
 def login_requerido(vista):
-    """Decorador para rutas que solo pueden usar usuarios con sesión."""
+    """Decorador para rutas que solo pueden usar usuarios con sesión.
+
+    Con contraseña temporal (cuenta nueva) solo se puede cambiar la contraseña.
+    """
     @wraps(vista)
     def envoltura(*args, **kwargs):
         u = usuario_actual()
         if u is None:
             return jsonify(error="Inicia sesión para continuar."), 401
+        if u.cambiar_password and request.endpoint not in PERMITIDO_CON_TEMPORAL:
+            return jsonify(error="Primero cambia tu contraseña temporal.", cambiar_password=True), 403
         g.usuario = u
         return vista(*args, **kwargs)
     return envoltura

@@ -1,4 +1,4 @@
-"""Credenciales de Google (una sola autorización para YouTube, Calendar y Gmail).
+"""Credenciales de Google para Gmail: mandar al equipo el aviso del tema (una sola autorización).
 
 Archivos en secretos/ (nunca en git):
   client_secret.json  -> se descarga de Google Cloud Console (OAuth, "App de escritorio")
@@ -9,8 +9,6 @@ from pathlib import Path
 from flask import current_app
 
 ALCANCES = [
-    "https://www.googleapis.com/auth/youtube.upload",
-    "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/gmail.send",   # avisos del tema al equipo
 ]
 

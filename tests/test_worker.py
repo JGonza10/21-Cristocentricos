@@ -31,20 +31,18 @@ def test_migracion_agrega_columnas_sin_borrar_datos(tmp_path):
         assert db.session.execute(db.text("PRAGMA journal_mode")).scalar() == "wal"
 
 
-def test_planificador_version_corta(app):
+def test_planificador(app):
     sched = worker.crear_planificador(app)
     ids = {j.id for j in sched.get_jobs()}
-    assert ids == {"latido", "carrusel", "reels", "recortes", "avisos", "ideas", "grabacion", "bitacora"}
+    assert ids == {"latido", "carrusel", "reels", "recortes", "avisos", "ideas", "laptop"}
 
 
-def test_planificador_tiene_todos_los_agentes(app):
-    app.config["VERSION_CORTA"] = False
-    sched = worker.crear_planificador(app)
-    ids = {j.id for j in sched.get_jobs()}
-    assert ids == {"latido", "carrusel", "reels", "recortes", "publicacion", "reparto", "invitaciones", "reporte",
-                   "avisos", "ideas", "grabacion", "bitacora"}
-    reparto = sched.get_job("reparto").trigger
-    assert "day_of_week='sun'" in str(reparto) and "hour='18'" in str(reparto)
+def test_la_laptop_reporta_su_estado_a_la_nube(app):
+    """El worker guarda el estilo y Gmail en la base; la nube lo muestra en Inicio."""
+    import json
+    with app.app_context():
+        datos = json.loads(worker.reportar_laptop())
+        assert set(datos) == {"estilo", "google"} and len(worker.reportar_laptop()) <= 300
 
 
 def test_agente_que_falla_no_tumba_al_worker(app, monkeypatch):
@@ -61,34 +59,31 @@ def test_agente_que_falla_no_tumba_al_worker(app, monkeypatch):
 def test_estado_general(app, cliente):
     login(cliente)
     d = cliente.get("/api/estado").get_json()
-    assert d["worker_activo"] is False and d["google"] is False and d["meta"] is False
-    assert d["bandeja"] == {"pendiente": 0, "aprobado": 0, "rechazado": 0}
+    assert d["worker_activo"] is False and d["google"] is False
+    assert d["material"] == {"total": 0, "carrusel": 0, "reel": 0}
+    assert "meta" not in d and "obs" not in d and "publicaciones_conteo" not in d
+    assert {a["nombre"] for a in d["agentes"]} == {"carrusel", "reels", "avisos", "ideas"}
     with app.app_context():
         latido("worker", "Activo", ok=True)
-        latido("reels", "1 reel nuevo en la bandeja", ok=True)
+        latido("reels", "1 reel nuevo en Material", ok=True)
     d = cliente.get("/api/estado").get_json()
     assert d["worker_activo"] is True
     reels = next(a for a in d["agentes"] if a["nombre"] == "reels")
-    assert reels["mensaje"] == "1 reel nuevo en la bandeja" and reels["titulo"] == "Reels"
+    assert reels["mensaje"] == "1 reel nuevo en Material"
 
 
-def test_estado_trae_conteos_para_el_diagrama(app, cliente):
+def test_estado_trae_conteos(app, cliente):
     from datetime import date
 
     from app.bandeja import crear_paquete
-    from app.modelos import Grabacion, Publicacion
+    from app.modelos import Grabacion
     login(cliente)
-    d = cliente.get("/api/estado").get_json()
-    assert d["pendientes_por_tipo"] == {} and d["grabaciones_conteo"] == {} and d["publicaciones_conteo"] == {}
     with app.app_context():
         crear_paquete("carrusel", date(2026, 10, 19), "Invitación")
-        reel = crear_paquete("reel", date(2026, 10, 19), "Reel 1")
+        crear_paquete("reel", date(2026, 10, 19), "Reel 1")
         crear_paquete("reel", date(2026, 10, 19), "Reel 2")
         db.session.add(Grabacion(nombre="evento.mkv", estado="procesando"))
-        db.session.add(Publicacion(paquete_id=reel.id, red="youtube", estado="error"))
         db.session.commit()
     d = cliente.get("/api/estado").get_json()
-    assert d["pendientes_por_tipo"] == {"carrusel": 1, "reel": 2}
+    assert d["material"] == {"total": 3, "carrusel": 1, "reel": 2}
     assert d["grabaciones_conteo"] == {"procesando": 1}
-    assert d["publicaciones_conteo"] == {"error": 1}
-    assert d["publicaciones_por_red"] == {"youtube": {"error": 1}}

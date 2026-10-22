@@ -1,1 +1,1 @@
-"""Servicios externos: ffmpeg, Whisper, Google (YouTube y Calendar) y Meta."""
+"""Servicios: ffmpeg, edición con el estilo del cliente, Whisper y Gmail."""

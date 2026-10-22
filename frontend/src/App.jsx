@@ -1,3 +1,4 @@
+import { fijarModo } from './modo.js'
 import { useCallback, useEffect, useState } from 'react'
 import { api, olvidarCsrf } from './api.js'
 import { aplicarTema, temaActual } from './tema.js'
@@ -5,20 +6,16 @@ import { Luna, Sol } from './iconos.jsx'
 import Login from './paginas/Login.jsx'
 import Inicio from './paginas/Inicio.jsx'
 import Contenido from './paginas/Contenido.jsx'
-import Evento from './paginas/Evento.jsx'
 import Configuracion from './paginas/Configuracion.jsx'
-import Estadisticas from './paginas/Estadisticas.jsx'
 import Modal from './componentes/Modal.jsx'
 import Ideas from './componentes/Ideas.jsx'
-import { VERSION_CORTA } from './version.js'
+import CambiarPassword from './componentes/CambiarPassword.jsx'
 
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio' },
-  { id: 'contenido', nombre: VERSION_CORTA ? 'Material' : 'Contenido' },
-  { id: 'evento', nombre: 'Evento', oculta: VERSION_CORTA },  // versión corta: se quitó (Gonza, 2026-10-20)
-  { id: 'estadisticas', nombre: 'Estadísticas', corto: 'Datos', oculta: VERSION_CORTA },
+  { id: 'contenido', nombre: 'Material' },
   { id: 'configuracion', nombre: 'Configuración', corto: 'Ajustes' },
-].filter((p) => !p.oculta)
+]
 
 function pestanaDeUrl() {
   const id = window.location.hash.replace('#', '')
@@ -28,20 +25,18 @@ function pestanaDeUrl() {
 export default function App() {
   const [usuario, setUsuario] = useState(undefined) // undefined = revisando sesión
   const [pestana, setPestana] = useState(pestanaDeUrl)
-  const [fechaEvento, setFechaEvento] = useState(null)
   const [tema, setTema] = useState(temaActual)
   const [ideas, setIdeas] = useState(false)
   const [diagrama, setDiagrama] = useState(false)
 
   useEffect(() => {
-    api('/api/auth/yo').then((d) => setUsuario(d.usuario)).catch(() => setUsuario(null))
+    api('/api/auth/yo').then((d) => { fijarModo(d.modo); setUsuario(d.usuario) }).catch(() => setUsuario(null))
     const alCambiar = () => setPestana(pestanaDeUrl())
     window.addEventListener('hashchange', alCambiar)
     return () => window.removeEventListener('hashchange', alCambiar)
   }, [])
 
-  function ir(id, fecha = null) {
-    if (fecha) setFechaEvento(fecha)
+  function ir(id) {
     window.location.hash = id
     setPestana(id)
     window.scrollTo({ top: 0 })
@@ -63,6 +58,22 @@ export default function App() {
 
   if (usuario === undefined) return <div className="cargando">Cargando…</div>
   if (!usuario) return <Login alEntrar={setUsuario} />
+  if (usuario.cambiar_password) {
+    // Cuenta nueva con contraseña temporal: antes de usar la app tiene que poner la suya.
+    return (
+      <main className="login">
+        <div className="login-caja">
+          <div className="etiqueta">Bienvenida, {usuario.nombre.split(' ')[0]}</div>
+          <h1 style={{ marginTop: 6 }}>Pon tu contraseña</h1>
+          <p className="muted" style={{ marginTop: 8 }}>Entraste con una contraseña temporal. Escribe una tuya para seguir.</p>
+          <div className="tarjeta" style={{ marginTop: 22 }}>
+            <CambiarPassword alCambiar={setUsuario} />
+          </div>
+          <p style={{ marginTop: 14 }}><button className="enlace" onClick={salir}>Salir</button></p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <>
@@ -94,8 +105,6 @@ export default function App() {
       <main className="envoltura" role="tabpanel">
         {pestana === 'inicio' && <Inicio ir={ir} verDiagrama={diagrama} alVerDiagrama={cerrarAvisoDiagrama} abrirIdeas={() => setIdeas(true)} />}
         {pestana === 'contenido' && <Contenido />}
-        {pestana === 'evento' && <Evento fecha={fechaEvento} ir={ir} />}
-        {pestana === 'estadisticas' && <Estadisticas ir={ir} />}
         {pestana === 'configuracion' && <Configuracion usuario={usuario} />}
       </main>
 

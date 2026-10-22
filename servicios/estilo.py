@@ -1,4 +1,4 @@
-"""Edición de reels con el estilo del cliente (versión corta, 2026-10-19).
+"""Edición de reels con el estilo del cliente (2026-10-19).
 
 Todo vive en la carpeta `estilo_cliente/` de la raíz del proyecto:
 

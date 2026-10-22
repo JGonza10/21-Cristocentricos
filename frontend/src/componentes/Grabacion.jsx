@@ -1,49 +1,8 @@
-// Grabación del evento: controlar OBS desde la app y subir un video desde otra computadora.
-import { useEffect, useRef, useState } from 'react'
-import { api, enviarCrudo } from '../api.js'
+// Subir el video limpio del celular desde cualquier computadora del equipo (por partes; se reanuda si se corta).
+import { useRef, useState } from 'react'
+import { enviarCrudo } from '../api.js'
 
 const PARTE = 8 * 1024 * 1024
-
-export function ControlObs({ alCambiar }) {
-  const [obs, setObs] = useState(null)
-  const [ocupado, setOcupado] = useState(false)
-  const [error, setError] = useState('')
-
-  const cargar = () => api('/api/obs').then(setObs).catch((e) => setError(e.message))
-  useEffect(() => {
-    cargar()
-    const t = setInterval(cargar, 10_000)
-    return () => clearInterval(t)
-  }, [])
-
-  async function hacer(accion) {
-    setOcupado(true)
-    setError('')
-    try {
-      setObs(await api(`/api/obs/${accion}`, { metodo: 'POST' }))
-      alCambiar?.()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  if (!obs) return <p className="chico-texto">Revisando OBS…</p>
-  if (!obs.instalado) return <p className="chico-texto">OBS no está instalado en esta computadora. Si grabaste en otra, usa «Subir grabación».</p>
-  return (
-    <div className="obs">
-      <span className={`estado ${obs.grabando ? 'activo' : obs.conectado ? 'ok' : 'off'} en-linea`}>
-        {obs.grabando ? `Grabando${obs.duracion ? ` · ${obs.duracion.slice(0, 8)}` : ''}` : obs.conectado ? 'OBS listo' : 'OBS cerrado'}
-      </span>
-      {obs.grabando
-        ? <button className="btn suave chico" disabled={ocupado} onClick={() => hacer('detener')}>Detener grabación</button>
-        : <button className="btn chico" disabled={ocupado} onClick={() => hacer('iniciar')}>{ocupado ? 'Abriendo OBS…' : 'Empezar a grabar'}</button>}
-      {!obs.conectado && obs.mensaje && <p className="chico-texto">{obs.mensaje} Los días de evento se abre y graba solo de 9:55 a 11:05.</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-    </div>
-  )
-}
 
 export function SubirGrabacion({ fecha, alTerminar }) {
   const [archivo, setArchivo] = useState(null)

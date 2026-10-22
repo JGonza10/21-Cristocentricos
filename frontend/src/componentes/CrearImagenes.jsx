@@ -2,6 +2,7 @@
 // Salen solas al guardar el tema; aquí se crean al momento o se rehacen («Otra versión») si cambió el tema.
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { enNube } from '../modo.js'
 
 export default function CrearImagenes({ fecha, listo, alCrear, alVerMaterial }) {
   const [tema, setTema] = useState(undefined)
@@ -35,11 +36,12 @@ export default function CrearImagenes({ fecha, listo, alCrear, alVerMaterial }) 
       <p>Se arman <b>5 imágenes para redes sociales</b> con el tema <b>«{tema.titulo}»</b>
         {tema.descripcion ? <>, su descripción</> : null}{tema.cita ? <> y la cita bíblica</> : null}. Quedan en Material para descargarlas y subirlas.</p>
       {listo && !aviso && <p className="tema-aviso">Las imágenes de este evento ya están listas.</p>}
+      {enNube() && !listo && <p className="tema-aviso">La laptop las arma sola en unos minutos (tiene que estar prendida con los agentes).</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {aviso && <p className="tema-aviso" role="status">{aviso}</p>}
       <div className="botones">
-        {!listo && <button className="btn" disabled={ocupado} onClick={() => crear(false)}>{ocupado ? 'Creando…' : 'Crear imágenes'}</button>}
-        {listo && <button className="btn suave chico" disabled={ocupado} onClick={() => crear(true)}>Otra versión</button>}
+        {!enNube() && !listo && <button className="btn" disabled={ocupado} onClick={() => crear(false)}>{ocupado ? 'Creando…' : 'Crear imágenes'}</button>}
+        {!enNube() && listo && <button className="btn suave chico" disabled={ocupado} onClick={() => crear(true)}>Otra versión</button>}
         <button className="btn suave chico" onClick={alVerMaterial}>Ver en Material</button>
       </div>
     </div>

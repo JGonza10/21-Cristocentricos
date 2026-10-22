@@ -1,26 +1,25 @@
-"""Avance guiado de cada evento: los 7 pasos de la versión corta, en orden.
+"""Avance guiado de cada evento: los 7 pasos, en orden.
 
 Cada paso está hecho, omitido (no era necesario) o pendiente. Muchos se comprueban solos con los
 datos del sistema; los demás se marcan a mano. El paso actual es el primero pendiente: solo ese se
 puede marcar a mano, así no se brinca ninguno.
 
-    GET /api/avance/activo           el evento de hoy o el próximo (los pasados van a la bitácora)
+    GET /api/avance/activo           el evento de hoy o el próximo
     GET /api/avance/<fecha>          avance de un evento
     PUT /api/avance/<fecha>/<paso>   {"accion": "hecho" | "omitir" | "deshacer", "nota": "..."}
 """
-from datetime import date, timedelta
+from datetime import date
 
 from flask import Blueprint, current_app, g, jsonify, request
 
 from .extensiones import db
-from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, BitacoraEvento, Grabacion, Paquete, Tema, Turno
+from .modelos import CHECKLIST, PASOS_EVENTO, AvancePaso, Grabacion, Paquete, Tema
 from .seguridad import login_requerido
 
 bp = Blueprint("avance", __name__, url_prefix="/api/avance")
 
-DIAS_ATRAS = 60  # la bitácora revisa hasta 60 días atrás por si el worker estuvo apagado
 
-# Cómo se cumple cada paso (lo ve la persona en la tarjeta). Versión corta: 7 pasos.
+# Cómo se cumple cada paso (lo ve la persona en la tarjeta).
 COMO = {
     "tema": "Se marca solo cuando el evento tiene tema guardado en el calendario.",
     "guion": "Se marca solo cuando el guion está guardado: escríbelo, pégalo o cárgalo desde un archivo (.docx, .pdf, "
@@ -55,13 +54,13 @@ def _error(e: ErrorAvance):
 
 
 def _fecha(texto: str) -> date:
-    from agentes.fechas import es_dia_de_evento
+    from .temas import es_dia_de_evento
     try:
         f = date.fromisoformat(texto)
     except (TypeError, ValueError):
         raise ErrorAvance("Fecha no válida.") from None
     if not es_dia_de_evento(f):
-        raise ErrorAvance("Solo hay evento los lunes y viernes.")
+        raise ErrorAvance("Ese día no tiene evento: ponle un tema en el calendario.")
     return f
 
 
@@ -130,43 +129,12 @@ def avance(f: date) -> dict:
             "pasos": pasos, "actual": actual, "hechos": hechos, "total": len(pasos), "completo": actual is None}
 
 
-def _tuvo_actividad(f: date) -> bool:
-    return any(m.query.filter_by(**{campo: f}).first() is not None for m, campo in (
-        (Tema, "fecha"), (Grabacion, "fecha_evento"), (Paquete, "fecha_evento"), (AvancePaso, "fecha"), (Turno, "fecha")))
-
-
 def evento_activo() -> date:
-    """El evento de hoy (si hoy hay) o el próximo. Los pasados ya no se muestran: quedan en la bitácora."""
+    """El evento de hoy (si hoy hay) o el próximo."""
     from agentes import fechas
-    return fechas.proximos_eventos(fechas.hoy_cdmx(), 7)[0]
 
-
-def archivar(f: date) -> BitacoraEvento:
-    """Guarda (o actualiza) la foto final de un evento pasado para las estadísticas."""
-    from .reportes import _registro
-    a = avance(f)
-    fila = next((r for r in _registro() if r["fecha"] == f.isoformat()), {})
-    datos = {k: v for k, v in fila.items() if k not in ("fecha", "tema")}
-    datos.setdefault("evento", a["nombre"])
-    b = db.session.get(BitacoraEvento, f) or BitacoraEvento(fecha=f)
-    b.tema, b.hechos, b.total = a["tema"], a["hechos"], a["total"]
-    b.pasos, b.datos = {p["id"]: p["estado"] for p in a["pasos"]}, datos
-    db.session.add(b)
-    return b
-
-
-def archivar_pasados() -> int:
-    """Pasa a la bitácora los eventos que ya pasaron y se trabajaron. Devuelve cuántos archivó."""
-    from agentes import fechas
-    hoy = fechas.hoy_cdmx()
-    n = 0
-    for f in fechas.proximos_eventos(hoy - timedelta(DIAS_ATRAS), DIAS_ATRAS):
-        if f >= hoy or db.session.get(BitacoraEvento, f) or not _tuvo_actividad(f):
-            continue
-        archivar(f)
-        n += 1
-    db.session.commit()
-    return n
+    from .temas import dias_de_evento
+    return dias_de_evento(fechas.hoy_cdmx(), 7)[0]
 
 
 @bp.get("/activo")

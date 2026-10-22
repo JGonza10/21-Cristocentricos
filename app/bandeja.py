@@ -1,10 +1,8 @@
-"""Bandeja de aprobación: /api/bandeja/...
+"""Material: /api/bandeja/...
 
-Reglas:
-- Todo lo que preparan los agentes entra como "pendiente".
-- Solo una persona con sesión puede aprobar, rechazar o editar el texto.
-- El agente de publicación (fase 5) solo toma lo que está "aprobado".
-- Si se edita algo, primero debe estar pendiente: lo aprobado no cambia a escondidas.
+Aquí llegan las 5 imágenes de difusión (al guardar el tema) y los 5 reels editados (cuando llega
+el video del celular). Se puede ajustar el texto para publicar, pedir otro recorte de un reel,
+descargar los archivos o vaciar todo para empezar de cero. Nada se publica solo.
 """
 import shutil
 from datetime import date
@@ -14,18 +12,16 @@ from flask import Blueprint, abort, current_app, g, jsonify, request, send_from_
 from sqlalchemy import func
 
 from .extensiones import db
-from .modelos import ESTADOS_PAQUETE, REDES, TIPOS_PAQUETE, HistorialPaquete, Paquete, Publicacion, ahora
-from .seguridad import login_requerido
+from .modelos import TIPOS_PAQUETE, HistorialPaquete, Paquete, ahora
+from .seguridad import login_requerido, solo_en_laptop
 
 bp = Blueprint("bandeja", __name__, url_prefix="/api/bandeja")
 
 TITULO_MAX = 120
 TEXTO_MAX = 2200   # límite de texto de Instagram, el más corto de las redes que usamos
-MOTIVO_MAX = 300
 EXTENSIONES_VISIBLES = {".png", ".jpg", ".jpeg", ".webp", ".mp4"}
 
-MSG_OCUPADO = "Otra persona cambió este paquete hace un momento. Ya te mostramos la versión nueva."
-MSG_NO_EDITABLE = "Solo se puede editar un paquete pendiente. Regrésalo a pendientes primero."
+MSG_OCUPADO = "Otra persona cambió esta pieza hace un momento. Ya te mostramos la versión nueva."
 
 
 class ErrorBandeja(Exception):
@@ -58,7 +54,7 @@ def _nombre_archivo_valido(nombre) -> bool:
 def crear_paquete(tipo: str, fecha_evento: date, titulo: str, texto: str = "",
                   carpeta: str = "", archivos: list[str] | None = None,
                   datos: dict | None = None) -> Paquete:
-    """Mete un paquete nuevo a la bandeja como pendiente. Lo usan los agentes (fases 3 y 4)."""
+    """Agrega una pieza nueva a Material. La usan los agentes de difusión y de reels."""
     if tipo not in TIPOS_PAQUETE:
         raise ErrorBandeja("Tipo de paquete no válido.")
     if not isinstance(fecha_evento, date):
@@ -89,46 +85,34 @@ def actualizar_por_agente(pid: int, cambios: dict, accion: str, detalle: str | N
     db.session.expire_all()
 
 
-def paquetes_aprobados() -> list[Paquete]:
-    """Lo único que el agente de publicación tiene permitido tocar."""
-    return Paquete.query.filter_by(estado="aprobado").order_by(Paquete.fecha_evento).all()
-
-
 def conteos() -> dict:
-    filas = db.session.query(Paquete.estado, func.count(Paquete.id)).group_by(Paquete.estado).all()
-    resultado = {e: 0 for e in ESTADOS_PAQUETE}
-    resultado.update(dict(filas))
-    return resultado
+    """{"total": n, "carrusel": n, "reel": n}"""
+    filas = dict(db.session.query(Paquete.tipo, func.count(Paquete.id)).group_by(Paquete.tipo).all())
+    return {"total": sum(filas.values()), **{t: filas.get(t, 0) for t in TIPOS_PAQUETE}}
 
 
-def _cambiar(pid: int, version, estados_permitidos: tuple, cambios: dict,
-             accion: str, detalle: str | None = None) -> Paquete:
-    """Aplica un cambio solo si nadie más tocó el paquete (misma versión) y su estado lo permite.
+def _cambiar(pid: int, version, cambios: dict, accion: str, detalle: str | None = None) -> Paquete:
+    """Aplica un cambio solo si nadie más tocó la pieza (misma versión).
 
-    Se hace en un solo UPDATE ... WHERE id=? AND version=? AND estado IN (...), así dos
-    personas no pueden aprobar y rechazar lo mismo al mismo tiempo.
+    Se hace en un solo UPDATE ... WHERE id=? AND version=?, así dos personas que editan
+    el mismo texto a la vez no se pisan.
     """
     if not isinstance(version, int) or isinstance(version, bool):
-        raise ErrorBandeja("Falta la versión del paquete. Recarga la página.")
+        raise ErrorBandeja("Falta la versión de la pieza. Recarga la página.")
     cambios = {**cambios, "version": Paquete.version + 1, "actualizado": ahora()}
-    filas = (Paquete.query
-             .filter(Paquete.id == pid, Paquete.version == version, Paquete.estado.in_(estados_permitidos))
+    filas = (Paquete.query.filter(Paquete.id == pid, Paquete.version == version)
              .update(cambios, synchronize_session=False))
     if filas == 0:
         db.session.rollback()
-        actual = db.session.get(Paquete, pid)
-        if actual is None:
-            raise ErrorBandeja("No encontramos ese paquete.", 404)
-        if actual.version != version:
-            raise ErrorBandeja(MSG_OCUPADO, 409)
-        raise ErrorBandeja(MSG_NO_EDITABLE if accion == "editado"
-                           else "Ese paquete ya no está en un estado que permita esta acción.", 409)
+        if db.session.get(Paquete, pid) is None:
+            raise ErrorBandeja("No encontramos esa pieza.", 404)
+        raise ErrorBandeja(MSG_OCUPADO, 409)
     db.session.add(HistorialPaquete(paquete_id=pid, usuario_id=g.usuario.id, accion=accion,
                                     detalle=detalle))
     db.session.commit()
     p = db.session.get(Paquete, pid)
     db.session.refresh(p)
-    current_app.logger.info("Paquete %s %s por %s", pid, accion, g.usuario.usuario)
+    current_app.logger.info("Pieza %s %s por %s", pid, accion, g.usuario.usuario)
     return p
 
 
@@ -155,11 +139,7 @@ def _datos() -> dict:
 @bp.get("")
 @login_requerido
 def listar():
-    estado = request.args.get("estado", "pendiente")
-    if estado not in ESTADOS_PAQUETE:
-        raise ErrorBandeja("Estado no válido.")
-    orden = Paquete.fecha_evento.asc() if estado == "pendiente" else Paquete.actualizado.desc()
-    paquetes = Paquete.query.filter_by(estado=estado).order_by(orden, Paquete.id).limit(100).all()
+    paquetes = Paquete.query.order_by(Paquete.fecha_evento.asc(), Paquete.id).limit(200).all()
     return jsonify(paquetes=[p.a_dict() for p in paquetes], conteos=conteos())
 
 
@@ -187,66 +167,14 @@ def editar(pid: int):
         cambios["texto"] = _limpiar_texto(datos["texto"], "texto", TEXTO_MAX)
     if not cambios:
         raise ErrorBandeja("No hay nada que guardar.")
-    p = _cambiar(pid, datos.get("version"), ("pendiente",), cambios, "editado")
+    p = _cambiar(pid, datos.get("version"), cambios, "editado")
     return jsonify(paquete=p.a_dict())
-
-
-@bp.post("/<int:pid>/aprobar")
-@login_requerido
-def aprobar(pid: int):
-    datos = _datos()
-    p = _cambiar(pid, datos.get("version"), ("pendiente",),
-                 {"estado": "aprobado", "motivo_rechazo": None,
-                  "revisado_por_id": g.usuario.id, "revisado_en": ahora()}, "aprobado")
-    return jsonify(paquete=p.a_dict(), conteos=conteos())
-
-
-@bp.post("/<int:pid>/rechazar")
-@login_requerido
-def rechazar(pid: int):
-    datos = _datos()
-    motivo = _limpiar_texto(datos.get("motivo", ""), "motivo", MOTIVO_MAX)
-    p = _cambiar(pid, datos.get("version"), ("pendiente",),
-                 {"estado": "rechazado", "motivo_rechazo": motivo or None,
-                  "revisado_por_id": g.usuario.id, "revisado_en": ahora()}, "rechazado", motivo or None)
-    return jsonify(paquete=p.a_dict(), conteos=conteos())
-
-
-@bp.post("/<int:pid>/reabrir")
-@login_requerido
-def reabrir(pid: int):
-    """Regresa un paquete aprobado o rechazado a pendientes (para corregirlo o pensarlo otra vez).
-
-    No se puede si ya se publicó (o se está subiendo) en alguna red. Las carpetas de
-    subir_manual que ya se habían preparado se borran: al aprobarlo otra vez se hacen de nuevo.
-    """
-    datos = _datos()
-    actual = db.session.get(Paquete, pid) or abort(404)
-    if any(x.estado in ("publicado", "subiendo") for x in actual.publicaciones):
-        raise ErrorBandeja("Este paquete ya se publicó en alguna red; ya no se puede regresar a pendientes.", 409)
-    p = _cambiar(pid, datos.get("version"), ("aprobado", "rechazado"),
-                 {"estado": "pendiente", "motivo_rechazo": None,
-                  "revisado_por_id": None, "revisado_en": None}, "reabierto")
-    _borrar_publicaciones(p)
-    return jsonify(paquete=p.a_dict(), conteos=conteos())
-
-
-def _borrar_publicaciones(p: Paquete) -> None:
-    raiz = Path(current_app.config["PAQUETES_DIR"]).resolve()
-    for pub in list(p.publicaciones):
-        if pub.ruta:
-            carpeta = (raiz / pub.ruta).resolve()
-            if raiz in carpeta.parents:
-                shutil.rmtree(carpeta, ignore_errors=True)
-        db.session.delete(pub)
-    db.session.commit()
-    db.session.refresh(p)
 
 
 @bp.post("/<int:pid>/recortar")
 @login_requerido
 def recortar(pid: int):
-    """Ajuste manual de inicio/fin de un reel (CLAUDE.md §2.1.7). El worker regenera el video."""
+    """Ajuste manual de inicio/fin de un reel. El worker vuelve a editar el video."""
     datos = _datos()
     actual = db.session.get(Paquete, pid) or abort(404)
     if actual.tipo != "reel" or not (actual.datos or {}).get("grabacion_id"):
@@ -261,38 +189,16 @@ def recortar(pid: int):
                            f"y quedar dentro de la grabación (0 a {total:.0f} s).")
     nuevos = {**(actual.datos or {}), "recortar": {"inicio": round(inicio, 2), "fin": round(fin, 2)}}
     nuevos.pop("error_recorte", None)
-    p = _cambiar(pid, datos.get("version"), ("pendiente",), {"datos": nuevos}, "editado",
+    p = _cambiar(pid, datos.get("version"), {"datos": nuevos}, "editado",
                  f"Recorte pedido: {inicio:.1f} s a {fin:.1f} s")
     return jsonify(paquete=p.a_dict())
 
 
-@bp.post("/<int:pid>/publicaciones/<red>")
-@login_requerido
-def publicacion(pid: int, red: str):
-    """Marca como subido a mano lo que estaba listo en subir_manual/, o reintenta un error."""
-    if red not in REDES:
-        abort(404)
-    accion = _datos().get("accion")
-    pub = Publicacion.query.filter_by(paquete_id=pid, red=red).first() or abort(404)
-    if pub.paquete.estado != "aprobado":
-        raise ErrorBandeja("Solo se publica lo aprobado.", 409)
-    if accion == "subido" and pub.estado == "listo_manual":
-        pub.estado = "publicado"
-    elif accion == "reintentar" and pub.estado == "error":
-        pub.estado, pub.intentos, pub.error = "error", 0, None   # el agente lo vuelve a intentar
-    else:
-        raise ErrorBandeja("Esa acción no aplica en este momento.", 409)
-    pub.actualizado = ahora()
-    db.session.add(HistorialPaquete(paquete_id=pid, usuario_id=g.usuario.id, accion=f"{red}:{accion}"[:20]))
-    db.session.commit()
-    current_app.logger.info("Paquete %s: %s %s por %s", pid, red, accion, g.usuario.usuario)
-    return jsonify(paquete=db.session.get(Paquete, pid).a_dict())
-
-
 @bp.get("/<int:pid>/archivo/<nombre>")
 @login_requerido
+@solo_en_laptop
 def archivo(pid: int, nombre: str):
-    """Vista previa de una imagen o video del paquete. Solo los archivos que el paquete declara."""
+    """Vista previa o descarga de una imagen o video. Solo los archivos que la pieza declara."""
     p = db.session.get(Paquete, pid) or abort(404)
     if nombre not in (p.archivos or []) or Path(nombre).suffix.lower() not in EXTENSIONES_VISIBLES:
         abort(404)
@@ -304,3 +210,41 @@ def archivo(pid: int, nombre: str):
     resp = send_from_directory(carpeta, nombre, max_age=0)
     resp.headers["Cache-Control"] = "private, no-store"
     return resp
+
+
+# --- Vaciar Material (empezar de cero) ------------------------------------------------
+
+def vaciar_material() -> dict:
+    """Borra todas las piezas (imágenes de difusión y reels) con su historial y sus archivos en
+    paquetes/, y de «Grabaciones recientes» las grabaciones cuyo video ya no está en grabaciones/.
+    Los videos que siguen en la carpeta se conservan (si no, se volverían a procesar).
+    """
+    from .modelos import Grabacion
+    n = Paquete.query.count()
+    HistorialPaquete.query.delete()
+    Paquete.query.delete()
+    carpeta_grab = Path(current_app.config["GRABACIONES_DIR"])
+    sin_video = [x for x in Grabacion.query.all() if not (carpeta_grab / x.nombre).is_file()]
+    for x in sin_video:
+        db.session.delete(x)
+    db.session.commit()
+    carpeta = Path(current_app.config["PAQUETES_DIR"])
+    if carpeta.is_dir():
+        for x in carpeta.iterdir():
+            if x.is_dir():
+                shutil.rmtree(x, ignore_errors=True)
+            else:
+                x.unlink(missing_ok=True)
+    current_app.logger.info("Material vaciado: %s piezas y %s grabaciones sin video", n, len(sin_video))
+    return {"paquetes": n, "grabaciones": len(sin_video)}
+
+
+@bp.post("/vaciar")
+@login_requerido
+@solo_en_laptop
+def vaciar():
+    if str((request.get_json(silent=True) or {}).get("confirmar", "")).strip().upper() != "BORRAR":
+        raise ErrorBandeja("Para vaciar Material escribe BORRAR.")
+    r = vaciar_material()
+    current_app.logger.info("Material vaciado por %s", g.usuario.usuario)
+    return jsonify(**r, conteos=conteos())

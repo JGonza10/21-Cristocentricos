@@ -2,8 +2,7 @@
 // El avance de cada evento (hecho / omitido / pendiente) viene de /api/avance.
 //   Estados en vivo: ok = al día · activo = trabajando · espera = te necesita · error = falló
 //                    apagado = agentes sin correr · sin = todavía no existe en el sistema
-// Versión corta (Gonza, 2026-10-19): 7 pasos. Turnos, bandeja, publicación, reporte y estadísticas
-// quedan ocultos (el proceso completo está en la v1.0: versiones/Cristocentricos v.1.0.zip).
+// Los 7 pasos de cada evento (Gonza, 2026-10-19).
 import { fechaCorta, proximoEvento } from './evento.js'
 import { fechaDeClave, fechaHora } from './util.js'
 
@@ -63,7 +62,7 @@ export const AVANCE = { hecho: 'Hecho', omitido: 'Omitido', pendiente: 'Pendient
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
 
 /** Estado en vivo: { pasos: [paso + {estado, corto, resumen, detalle}], nodos: {idNodo: {estado, corto}} } */
-export function calcularVivo(estado, _turnos, ahora = new Date()) {
+export function calcularVivo(estado, ahora = new Date()) {
   const e = estado ?? {}
   const agente = (n) => e.agentes?.find((a) => a.nombre === n) ?? {}
   const ultimaVez = (n) => (agente(n).ultimo_ok ? `Última vez: ${fechaHora(agente(n).ultimo_ok)}` : null)
@@ -108,9 +107,8 @@ export function calcularVivo(estado, _turnos, ahora = new Date()) {
   p.grabacion.detalle = [evento ? `Próximo evento: ${evento.nombre}, ${evento.faltan}.` : null,
     `${plural(Object.values(e.grabaciones_conteo ?? {}).reduce((a, b) => a + b, 0), 'grabación recibida', 'grabaciones recibidas')} en total.`]
   p.reels.detalle = [
-    est.activo === false ? 'Estilo del cliente apagado en estilo.json: se usa el look de la versión 1.0.'
-      : est.referencia ? `Estilo del cliente: ${plural(est.referencia, 'video de referencia', 'videos de referencia')} y ${plural(est.herramientas ?? 0, 'herramienta', 'herramientas')}.`
-        : 'Aún no está el video de referencia del cliente en estilo_cliente/referencia.',
+    est.referencia ? `Estilo del cliente: ${plural(est.referencia, 'video de referencia', 'videos de referencia')} y ${plural(est.herramientas ?? 0, 'herramienta', 'herramientas')}.`
+      : 'Aún no está el video de referencia del cliente en estilo_cliente/referencia.',
     est.error ? `estilo.json: ${est.error}` : null,
     ultimaVez('reels')]
   if (est.error) Object.assign(p.reels, { estado: 'error', corto: 'Revisa estilo.json' })

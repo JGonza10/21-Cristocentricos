@@ -1,4 +1,4 @@
-// Overlay del reloj para la transmisión (OBS / ventana compartida en StreamYard).
+// Reloj de la transmisión: se abre en una ventana y se comparte en StreamYard.
 // Página pública SIN datos privados: no llama a la API, todo se calcula en el navegador.
 //   /reloj?canal=Cristocéntricos  (solo tema perla, a pedido de Gonza)
 import React, { useEffect, useState } from 'react'

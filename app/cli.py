@@ -1,11 +1,10 @@
-"""Comandos de consola: flask --app app crear-usuario / cambiar-password / paquete-demo."""
-from datetime import date, timedelta
+"""Comandos de consola: flask --app app crear-usuario / cambiar-password / material-vaciar / estilo-...."""
+from datetime import date
 from pathlib import Path
 
 import click
 from flask import current_app
 
-from .bandeja import crear_paquete
 from .extensiones import db
 from .modelos import Usuario
 from .seguridad import hashear, normalizar_usuario, problema_password
@@ -50,34 +49,67 @@ def registrar(app):
         db.session.commit()
         click.echo("Contraseña actualizada.")
 
-    @app.cli.command("paquete-demo")
-    def paquete_demo():
-        """Mete un carrusel y un reel de ejemplo a la bandeja (para probarla sin agentes)."""
-        hoy = date.today()
-        lunes = hoy + timedelta(days=(0 - hoy.weekday()) % 7 or 7)
-        crear_paquete(
-            "carrusel", lunes, f"Invitación al evento del lunes {lunes.day}",
-            "Te invitamos a rezar juntos en el evento en vivo este lunes a las 10:00 am "
-            "(hora CDMX). Meditaremos los misterios gozosos.\n\n"
-            "Deja tus intenciones en los comentarios.\n\n#SantoRosario #Cristocéntricos #MisteriosGozosos")
-        crear_paquete(
-            "reel", hoy, "Reel 1 · Anuncio del primer misterio",
-            "Primer misterio gozoso: la Anunciación del ángel a María.\n\n#SantoRosario #Cristocéntricos")
-        click.echo("Listo: 2 paquetes de ejemplo en la bandeja (pestaña Contenido).")
-
     @app.cli.command("carrusel")
     @click.argument("fecha")
-    @click.option("--forzar", is_flag=True, help="Genera otro aunque ya exista uno para esa fecha.")
+    @click.option("--forzar", is_flag=True, help="Genera otras aunque ya existan para esa fecha.")
     def carrusel(fecha, forzar):
-        """Genera ya el carrusel de un evento. Ejemplo: flask --app app carrusel 2026-10-19"""
+        """Genera ya las 5 imágenes de difusión de un evento. Ejemplo: flask --app app carrusel 2026-10-23"""
         from agentes.carrusel import preparar_carrusel
         try:
             f = date.fromisoformat(fecha)
             p = preparar_carrusel(f, forzar=forzar)
         except ValueError as e:
-            raise click.ClickException(f"Fecha no válida (usa AAAA-MM-DD, lunes o viernes): {e}") from None
-        click.echo(f"Carrusel listo en la bandeja (paquete {p.id})." if p
-                   else "Ya existe un carrusel para esa fecha. Usa --forzar para hacer otro.")
+            raise click.ClickException(f"Fecha no válida (usa AAAA-MM-DD; lunes, viernes o un día con tema): {e}") from None
+        click.echo("Las 5 imágenes de difusión ya están en Material." if p
+                   else "Ya existen imágenes para esa fecha. Usa --forzar para hacer otras.")
+
+    @app.cli.command("copiar-base")
+    @click.option("--destino", envvar="DESTINO_URL", prompt="URL de la base destino (no se muestra)", hide_input=True,
+                  help="URL de PostgreSQL (en Railway: DATABASE_PUBLIC_URL). También se lee de DESTINO_URL.")
+    def copiar_base(destino):
+        """Copia los datos de esta base (la SQLite de la laptop) a otra vacía (la PostgreSQL de Railway).
+
+        Se copia todo menos los intentos de login y los latidos de los agentes. Si la base destino
+        ya tiene cuentas o temas, no se toca nada.
+        """
+        from sqlalchemy import create_engine, func, inspect, select, text
+
+        from . import url_base_de_datos
+        omitir = {"intentos_login", "estado_agentes"}
+        motor = create_engine(url_base_de_datos(destino.strip()))
+        db.metadata.create_all(motor)
+        with motor.connect() as con:
+            for tabla in ("usuarios", "temas"):
+                if con.execute(select(func.count()).select_from(db.metadata.tables[tabla])).scalar():
+                    raise click.ClickException(f"La base destino ya tiene datos en «{tabla}»: no se copió nada.")
+        copiadas = {}
+        with db.engine.connect() as origen, motor.begin() as con:
+            for tabla in db.metadata.sorted_tables:          # en orden: primero las que otras referencian
+                if tabla.name in omitir or not inspect(db.engine).has_table(tabla.name):
+                    continue
+                filas = [dict(f) for f in origen.execute(select(tabla)).mappings()]
+                if filas:
+                    con.execute(tabla.insert(), filas)
+                copiadas[tabla.name] = len(filas)
+            if motor.dialect.name == "postgresql":           # que los id nuevos sigan después de los copiados
+                for tabla in db.metadata.sorted_tables:
+                    if "id" in tabla.c and tabla.c.id.autoincrement in (True, "auto") and tabla.name not in omitir:
+                        siguiente = (con.execute(select(func.max(tabla.c.id))).scalar() or 0) + 1
+                        con.execute(text("SELECT setval(pg_get_serial_sequence(:tabla, 'id'), :valor, false)"),
+                                    {"tabla": tabla.name, "valor": siguiente})
+        for nombre, n in copiadas.items():
+            click.echo(f"  {nombre}: {n}")
+        click.echo("Listo: datos copiados.")
+
+    @app.cli.command("material-vaciar")
+    @click.option("--si", is_flag=True, help="No preguntar.")
+    def material_vaciar(si):
+        """Borra todo lo de la pestaña Material (imágenes, reels y sus archivos) para empezar de cero."""
+        from .bandeja import vaciar_material
+        if not si:
+            click.confirm("Se borrarán todas las imágenes y reels de Material. ¿Continuar?", abort=True)
+        r = vaciar_material()
+        click.echo(f"Listo: {r['paquetes']} piezas y {r['grabaciones']} grabaciones sin video borradas.")
 
     @app.cli.command("reels-reintentar")
     @click.argument("archivo")
@@ -140,32 +172,9 @@ def registrar(app):
             raise click.ClickException(str(e)) from None
         click.echo(f"Listo: {salida} ({r['duracion']} s, {r['capas']} capas).")
 
-    @app.cli.command("repartir")
-    def repartir():
-        """Reparte ya los turnos vacíos de las próximas 2 semanas."""
-        from agentes.fechas import hoy_cdmx, proximos_eventos
-        from agentes.turnos import repartir as repartir_turnos
-        nuevos = repartir_turnos(proximos_eventos(hoy_cdmx(), 14))
-        click.echo(f"{len(nuevos)} turnos asignados.")
-
-    @app.cli.command("obs-configurar")
-    def obs_configurar():
-        """Activa el control de OBS desde la app (websocket con contraseña nueva en el .env)."""
-        from pathlib import Path
-
-        from servicios import obs
-        if not obs.instalado():
-            raise click.ClickException("OBS no está instalado. Instálalo con: winget install OBSProject.OBSStudio")
-        password = obs.configurar()
-        env = Path(current_app.root_path).parent / ".env"
-        lineas = [x for x in env.read_text(encoding="utf-8").splitlines() if not x.startswith("OBS_PASSWORD=")]
-        lineas.append(f"OBS_PASSWORD={password}")
-        env.write_text("\n".join(lineas) + "\n", encoding="utf-8")
-        click.echo("Listo: OBS acepta órdenes de la app. Cierra y vuelve a abrir OBS y reinicia iniciar.bat.")
-
     @app.cli.command("google-autorizar")
     def google_autorizar():
-        """Abre el navegador para autorizar YouTube y Google Calendar (una sola vez)."""
+        """Abre el navegador para autorizar Gmail (avisos del tema al equipo), una sola vez."""
         from servicios.google import autorizar
         try:
             token = autorizar()

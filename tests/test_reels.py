@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from PIL import Image
+
 
 from agentes import reels
 from app.extensiones import db
@@ -88,17 +88,6 @@ def test_cierre_solo_cuenta_al_final():
 
 # --- Subtítulos y silencios ---------------------------------------------------------
 
-def test_srt_con_tiempos_desde_cero_y_dos_renglones():
-    segs = [[98.0, 104.0, "Primer misterio gozoso: la Anunciación del ángel Gabriel a la Virgen María"],
-            [104.0, 110.0, "Dios te salve"], [200.0, 205.0, "fuera del tramo"]]
-    srt = reels.srt_para(segs, 100.0, 140.0)
-    bloques = [b for b in srt.strip().split("\n\n") if b]
-    assert bloques[0].splitlines()[1].startswith("00:00:00,000 --> ")
-    assert all(len(b.splitlines()) <= 4 for b in bloques)      # número, tiempo y máx. 2 renglones
-    assert "fuera del tramo" not in srt
-    assert "00:00:10,000" in srt                                # 'Dios te salve' termina en el s 10
-
-
 def test_parsear_silencios():
     salida = ("[silencedetect @ 0x1] silence_start: 12.5\n[silencedetect @ 0x1] silence_end: 15 | "
               "silence_duration: 2.5\n[silencedetect @ 0x1] silence_start: -0.01\n"
@@ -175,7 +164,7 @@ def test_falla_tecnica_no_expone_detalles(app, monkeypatch):
 
 @hay_ffmpeg
 def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
-    """Video de prueba de 50 s → 1 reel vertical 1080×1920 con audio, en la bandeja."""
+    """Video de prueba de 50 s → 1 reel vertical 1080×1920 con audio, en Material."""
     with app.app_context():
         carpeta = Path(app.config["GRABACIONES_DIR"])
         carpeta.mkdir(parents=True)
@@ -188,15 +177,10 @@ def test_de_punta_a_punta_con_ffmpeg(app, monkeypatch):
         g = Grabacion(nombre=video.name, fecha_evento=date(2026, 10, 19), tamano=video.stat().st_size)
         db.session.add(g)
         db.session.commit()
-        app.config["CARRUSEL_ESCENAS"] = True     # apagado en la versión corta; aquí se prueba que sigue sirviendo
         nuevos = reels.procesar(g)
-        assert [x.tipo for x in nuevos] == ["reel", "carrusel"]          # 1 reel + carrusel de escenas
+        assert [x.tipo for x in nuevos] == ["reel"]                      # solo reels (sin carrusel de escenas)
         p = nuevos[0]
-        assert p.titulo == "Reel 1 · Anuncio del primer misterio" and p.estado == "pendiente"
-        escenas = nuevos[1]
-        assert escenas.datos["momento"] == "despues" and len(escenas.archivos) == 5
-        with Image.open(Path(app.config["PAQUETES_DIR"]) / escenas.carpeta / "2.png") as img:
-            assert img.size == (1080, 1350)
+        assert p.titulo == "Reel 1 · Anuncio del primer misterio" and p.datos["momento"] == "despues"
         salida = Path(app.config["PAQUETES_DIR"]) / p.carpeta / "reel.mp4"
         info = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height",
                                "-of", "csv=p=0", str(salida)], capture_output=True, text=True).stdout

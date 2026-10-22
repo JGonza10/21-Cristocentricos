@@ -4,8 +4,8 @@ from flask_wtf.csrf import generate_csrf
 
 from .extensiones import db
 from .modelos import Usuario, ahora
-from .seguridad import (esta_bloqueado, login_requerido, normalizar_usuario,
-                        origen_cliente, registrar_intento, verificar)
+from .seguridad import (esta_bloqueado, hashear, login_requerido, normalizar_usuario,
+                        origen_cliente, problema_password, registrar_intento, verificar)
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -49,7 +49,7 @@ def login():
     u.ultimo_acceso = ahora()
     db.session.commit()
     current_app.logger.info("Login correcto: usuario=%s ip=%s", u.usuario, ip)
-    return jsonify(usuario=u.a_dict(), csrf=generate_csrf())
+    return jsonify(usuario=u.a_dict(), csrf=generate_csrf(), modo=current_app.config["MODO"])
 
 
 @bp.post("/logout")
@@ -61,4 +61,24 @@ def logout():
 @bp.get("/yo")
 @login_requerido
 def yo():
+    return jsonify(usuario=g.usuario.a_dict(), modo=current_app.config["MODO"])
+
+
+@bp.post("/cambiar-password")
+@login_requerido
+def cambiar_password():
+    """{"actual": "...", "nueva": "..."}. Obligatorio la primera vez que entra una cuenta nueva."""
+    d = request.get_json(silent=True) or {}
+    actual, nueva = d.get("actual"), d.get("nueva")
+    if not isinstance(actual, str) or not verificar(actual, g.usuario.hash_password):
+        return jsonify(error="La contraseña actual no es correcta."), 400
+    problema = problema_password(nueva)
+    if problema:
+        return jsonify(error=problema), 400
+    if nueva == actual:
+        return jsonify(error="La contraseña nueva debe ser distinta de la actual."), 400
+    g.usuario.hash_password = hashear(nueva)
+    g.usuario.cambiar_password = False
+    db.session.commit()
+    current_app.logger.info("Contraseña cambiada: usuario=%s", g.usuario.usuario)
     return jsonify(usuario=g.usuario.a_dict())

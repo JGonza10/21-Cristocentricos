@@ -1,6 +1,5 @@
 """Agente de avisos: cuando se guarda o cambia el tema de un evento, avisa al equipo por correo.
 
-La invitación de Google Calendar se actualiza aparte (agentes/turnos.sincronizar_invitaciones).
 """
 from flask import current_app
 

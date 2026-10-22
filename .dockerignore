@@ -1,0 +1,25 @@
+# Nada de datos, secretos, videos ni material del cliente en la imagen de la nube
+.env
+.env.*
+!.env.example
+.git
+.github
+.venv
+venv
+**/__pycache__
+.pytest_cache
+datos
+grabaciones
+paquetes
+secretos
+estilo_cliente
+videos_editados
+versiones
+video de prueba
+frontend/node_modules
+frontend/dist
+tests
+docs
+*.pdf
+*.docx
+*.zip

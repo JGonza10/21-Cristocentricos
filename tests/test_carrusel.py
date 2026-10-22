@@ -20,15 +20,6 @@ def test_genera_5_imagenes_del_tamano_correcto(app, tmp_path):
             assert img.size == (1080, 1350)
 
 
-@pytest.fixture
-def sin_video(monkeypatch):
-    """El reel promocional tarda unos segundos con ffmpeg; aquí basta con un archivo de mentira."""
-    def falso(f, carpeta):
-        carpeta.mkdir(parents=True, exist_ok=True)
-        (carpeta / "promo.mp4").write_bytes(b"0")
-    monkeypatch.setattr(carrusel, "_reel_promocional", falso)
-
-
 def _tema(app, f, titulo="El perdón que libera", **extra):
     from app.extensiones import db
     from app.modelos import Tema
@@ -60,21 +51,7 @@ def test_cita_del_tema(app):
         assert carrusel._cita(VIERNES) == carrusel.CITA_DEFECTO
 
 
-def test_difusion_completa_con_reel_promocional(app):
-    _tema(app, LUNES)
-    app.config["REEL_PROMO"] = True              # en la versión corta va apagado
-    with app.app_context():
-        nuevos = carrusel.preparar_difusion(LUNES)
-        assert [p.tipo for p in nuevos] == ["carrusel", "reel"]
-        assert all(p.datos["momento"] == "antes" and p.estado == "pendiente" for p in nuevos)
-        assert nuevos[0].archivos == ["1.png", "2.png", "3.png", "4.png", "5.png"]
-        assert nuevos[0].titulo == "Difusión · El perdón que libera"
-        video = Path(app.config["PAQUETES_DIR"]) / nuevos[1].carpeta / "promo.mp4"
-        from servicios import ffmpeg
-        assert 14 <= ffmpeg.duracion(str(video)) <= 16
-
-
-def test_preparar_mete_el_paquete_a_la_bandeja(app, sin_video):
+def test_preparar_mete_el_paquete_a_la_bandeja(app):
     with app.app_context():
         p = carrusel.preparar_carrusel(LUNES)
         assert p.estado == "pendiente" and p.tipo == "carrusel" and p.fecha_evento == LUNES
@@ -83,7 +60,7 @@ def test_preparar_mete_el_paquete_a_la_bandeja(app, sin_video):
         assert p.historial[0].accion == "creado"
 
 
-def test_no_duplica_salvo_que_se_fuerce(app, sin_video):
+def test_no_duplica_salvo_que_se_fuerce(app):
     with app.app_context():
         primero = carrusel.preparar_carrusel(LUNES)
         assert carrusel.preparar_carrusel(LUNES) is None
@@ -92,12 +69,16 @@ def test_no_duplica_salvo_que_se_fuerce(app, sin_video):
         assert Paquete.query.filter_by(tipo="carrusel").count() == 2
 
 
-def test_solo_lunes_y_viernes(app):
+def test_otro_dia_solo_con_tema(app):
+    martes = date(2026, 10, 20)
     with app.app_context(), pytest.raises(ValueError):
-        carrusel.preparar_carrusel(date(2026, 10, 20))
+        carrusel.preparar_carrusel(martes)
+    _tema(app, martes, titulo="Evento especial")
+    with app.app_context():
+        assert carrusel.preparar_carrusel(martes).fecha_evento == martes
 
 
-def test_tarea_arma_la_difusion_solo_con_tema(app, monkeypatch, sin_video):
+def test_tarea_arma_la_difusion_solo_con_tema(app, monkeypatch):
     _tema(app, VIERNES)
     _tema(app, date(2026, 11, 6), titulo="Primer evento principal")
     ahora = {"t": datetime(2026, 10, 17, 7, 5, tzinfo=fechas.CDMX)}
@@ -110,36 +91,26 @@ def test_tarea_arma_la_difusion_solo_con_tema(app, monkeypatch, sin_video):
         assert {p.fecha_evento for p in carrusel.tarea()} == {date(2026, 11, 6)}   # ya entra en las 2 semanas
 
 
-def test_tarea_no_arma_difusion_de_un_evento_que_ya_empezo(app, monkeypatch, sin_video):
+def test_tarea_no_arma_difusion_de_un_evento_que_ya_empezo(app, monkeypatch):
     _tema(app, VIERNES)
     monkeypatch.setattr(fechas, "ahora_cdmx", lambda: datetime(2026, 10, 23, 10, 0, tzinfo=fechas.CDMX))
     with app.app_context():
         assert carrusel.tarea() == []
 
 
-def test_comando_carrusel(app, sin_video):
+def test_comando_carrusel(app):
     runner = app.test_cli_runner()
     r = runner.invoke(args=["carrusel", "2026-10-19"])
-    assert r.exit_code == 0 and "Carrusel listo" in r.output
+    assert r.exit_code == 0 and "ya están en Material" in r.output
     r = runner.invoke(args=["carrusel", "2026-10-19"])
-    assert "Ya existe" in r.output
+    assert "Ya existen" in r.output
     r = runner.invoke(args=["carrusel", "2026-10-20"])
     assert r.exit_code != 0
-
-
-def test_frase_de_un_momento():
-    segs = [[0, 4, "Bueno"], [4, 9, "El amor de Dios no se cansa nunca de buscarnos."], [9, 12, "eh"]]
-    assert carrusel.frase_de(segs, 0, 12) == "El amor de Dios no se cansa nunca de buscarnos."
-    assert carrusel.frase_de(segs, 20, 30) == ""
 
 
 def test_fechas_en_espanol():
     assert fechas.nombre_fecha(LUNES) == "Lunes 19 de octubre"
     assert fechas.nombre_fecha(date(2026, 9, 16)) == "Miércoles 16 de septiembre"
     assert fechas.inicio(LUNES).utcoffset().total_seconds() == -6 * 3600   # CDMX sin horario de verano
-    assert fechas.proximos_eventos(date(2026, 10, 17), 7) == [LUNES, VIERNES]
+    assert fechas.proximos_fijos(date(2026, 10, 17), 7) == [LUNES, VIERNES]
 
-
-def test_frase_empieza_con_mayuscula():
-    segs = [[0, 6, "mandará a sus ángeles que te cuiden en todos tus caminos"]]
-    assert carrusel.frase_de(segs, 0, 6).startswith("Mandará a sus ángeles")

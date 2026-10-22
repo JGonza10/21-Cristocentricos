@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, enviarCrudo } from '../api.js'
 import { proximoEvento, claveFecha, esDiaDeEvento, nombreFecha } from '../evento.js'
 import { fechaDeClave, fechaHora } from '../util.js'
+import { enNube } from '../modo.js'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 
@@ -112,7 +113,7 @@ export default function Ideas({ alCambiar }) {
         </div>
         <div className="botones">
           <button className="btn chico" type="submit" disabled={ocupado || !texto.trim()}>Guardar idea</button>
-          {grabando
+          {enNube() ? null : grabando
             ? <button className="btn chico grabando" type="button" onClick={() => grabadora.current.stop()}>
               ■ Detener · {Math.floor(segundos / 60)}:{String(segundos % 60).padStart(2, '0')}</button>
             : <button className="btn suave chico" type="button" disabled={ocupado} onClick={empezarAudio}>● Grabar idea por voz</button>}
@@ -165,7 +166,7 @@ function IdeaFila({ idea, alCambiar }) {
         {idea.estado === 'error' && <span className="pill roja">No se entendió el audio</span>}
       </div>
       {idea.texto && <p className="idea-texto">{idea.texto}</p>}
-      {idea.audio && <audio controls preload="none" src={`/api/ideas/${idea.id}/audio`} />}
+      {idea.audio && !enNube() && <audio controls preload="none" src={`/api/ideas/${idea.id}/audio`} />}
       <div className="botones">
         {idea.texto && idea.estado !== 'usada' && (
           <>

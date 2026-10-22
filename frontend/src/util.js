@@ -1,5 +1,4 @@
 // Utilidades compartidas entre pantallas.
-export const REDES = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', youtube: 'YouTube' }
 
 export const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString('es-MX', {
   timeZone: 'America/Mexico_City', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
@@ -15,4 +14,3 @@ export function segundosATexto(s) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(seg).padStart(2, '0')}` : `${m}:${String(seg).padStart(2, '0')}`
 }
 
-export const nombres = (lista) => lista.map((i) => i.nombre).join(', ')

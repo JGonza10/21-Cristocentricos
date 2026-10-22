@@ -5,9 +5,10 @@ Flask-WTF==1.2.2
 bcrypt==4.3.0
 python-dotenv==1.2.2
 waitress==3.0.2
+psycopg[binary]==3.3.6      # PostgreSQL de Railway (la nube y la laptop comparten la base)
 tzdata==2026.5
 
-# Agentes (fases 3 a 8)
+# Agentes: imágenes, reels (Whisper y ffmpeg), guion desde archivo y avisos por Gmail
 APScheduler==3.11.0
 watchdog==6.0.0
 Pillow==13.0.0
@@ -18,7 +19,6 @@ google-api-python-client==2.201.0
 google-auth==2.62.0
 google-auth-oauthlib==1.5.0
 requests==2.34.2
-obsws-python==1.8.0
 
 # Pruebas y seguridad
 pytest==9.0.3

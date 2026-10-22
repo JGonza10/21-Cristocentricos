@@ -1,31 +1,23 @@
-"""Agente de imágenes: difusión antes del evento y carrusel de escenas después.
+"""Agente de imágenes de difusión.
 
-Difusión (en cuanto el evento tiene tema, hasta 14 días antes; o a mano con «Generar difusión»):
-  · Carrusel de 5 láminas 1080×1350: invitación, el tema, en vivo, intenciones y cierre.
-  · Reel promocional 1080×1920 de 15 s hecho con 3 láminas verticales (sin música: el audio de
-    moda se le pone al subirlo en cada red).
-Después del evento (lo llama el agente de reels al terminar):
-  · Carrusel de 5 láminas con escenas reales del video y frases que se dijeron.
+En cuanto el evento tiene tema (al guardarlo, o cada 15 minutos hasta 14 días antes) se arma un
+carrusel de 5 láminas 1080×1350: invitación, el tema, en vivo, intenciones y cierre.
 
 Colores de las piezas para redes: blanco y vino (CLAUDE.md §4.4), no el morado de la app.
 """
-import textwrap
-import uuid
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from flask import current_app
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageStat
+from PIL import Image, ImageDraw, ImageFont
 
 from app.bandeja import crear_paquete
 from app.extensiones import db
 from app.modelos import Paquete, Tema
-from servicios import ffmpeg
 
 from . import fechas
 
 ANCHO, ALTO = 1080, 1350
-ALTO_HISTORIA = 1920
 MARGEN = 96
 DIAS_ANTES = 14   # la difusión se arma en cuanto hay tema, hasta 2 semanas antes
 
@@ -300,18 +292,6 @@ def generar_imagenes(f: date, carpeta: Path) -> list[str]:
     return nombres
 
 
-def _reel_promocional(f: date, carpeta: Path) -> None:
-    """15 s verticales con 3 láminas de 1080×1920 (invitación, en vivo y te esperamos)."""
-    carpeta.mkdir(parents=True, exist_ok=True)
-    laminas = [_invitacion(f, ALTO_HISTORIA, 0), _en_vivo(f, ALTO_HISTORIA, 0), _cierre(f, ALTO_HISTORIA, 0)]
-    rutas = []
-    for i, img in enumerate(laminas, start=1):
-        ruta = carpeta / f"historia-{i}.png"
-        img.save(ruta, "PNG", optimize=True)
-        rutas.append(ruta)
-    ffmpeg.video_de_imagenes(rutas, carpeta / "promo.mp4", segundos=5)
-
-
 def _existentes(f: date, tipo: str, cual: str) -> list[Paquete]:
     """Piezas ya hechas por este agente. Las invitaciones viejas (sin «momento», con los misterios)
     no cuentan: así, al ponerle tema al evento, sale la difusión nueva."""
@@ -320,9 +300,10 @@ def _existentes(f: date, tipo: str, cual: str) -> list[Paquete]:
 
 
 def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
-    """Las 5 imágenes de difusión (y el reel promocional si REEL_PROMO=1). Sin `forzar`, no repite lo que ya existe."""
-    if not fechas.es_dia_de_evento(f):
-        raise ValueError(f"{f} no es lunes ni viernes.")
+    """Las 5 imágenes de difusión. Sin `forzar`, no repite lo que ya existe."""
+    from app.temas import es_dia_de_evento
+    if not es_dia_de_evento(f):
+        raise ValueError(f"{f} no tiene evento (no es lunes ni viernes y no tiene tema).")
     nuevos = []
     previos = _existentes(f, "carrusel", "antes")
     if forzar or not previos:
@@ -330,17 +311,11 @@ def preparar_difusion(f: date, forzar: bool = False) -> list[Paquete]:
         archivos = generar_imagenes(f, Path(current_app.config["PAQUETES_DIR"]) / rel)
         nuevos.append(crear_paquete("carrusel", f, f"Difusión · {_titulo(f)}"[:120], texto_difusion(f),
                                     carpeta=rel, archivos=archivos, datos={"momento": "antes"}))
-    previos = _existentes(f, "reel", "antes")
-    if current_app.config.get("REEL_PROMO", False) and (forzar or not previos):
-        rel = f"{f.isoformat()}/promo" + (f"-{len(previos) + 1}" if previos else "")
-        _reel_promocional(f, Path(current_app.config["PAQUETES_DIR"]) / rel)
-        nuevos.append(crear_paquete("reel", f, f"Reel de difusión · {_titulo(f)}"[:120], texto_difusion(f),
-                                    carpeta=rel, archivos=["promo.mp4"], datos={"momento": "antes"}))
     return nuevos
 
 
 def preparar_carrusel(f: date, forzar: bool = False) -> Paquete | None:
-    """Compatibilidad con el comando «flask carrusel»: arma la difusión y devuelve su carrusel."""
+    """Para el comando «flask carrusel»: arma la difusión y devuelve su carrusel."""
     nuevos = [p for p in preparar_difusion(f, forzar) if p.tipo == "carrusel"]
     return nuevos[0] if nuevos else None
 
@@ -352,130 +327,12 @@ def tarea() -> list[Paquete]:
     """
     ahora = fechas.ahora_cdmx()
     nuevos = []
-    for f in fechas.proximos_eventos(ahora.date(), DIAS_ANTES):
+    from app.temas import dias_de_evento
+    for f in dias_de_evento(ahora.date(), DIAS_ANTES):
         if ahora >= fechas.inicio(f) or _tema(f) is None:
             continue
         hechos = preparar_difusion(f)
         if hechos:
-            current_app.logger.info("Difusión del %s lista en la bandeja (%s piezas)", f, len(hechos))
+            current_app.logger.info("Difusión del %s lista en Material (%s piezas)", f, len(hechos))
             nuevos += hechos
     return nuevos
-
-
-# --- Después del evento: carrusel con escenas del video -----------------------------
-
-def _mejorar(img: Image.Image) -> Image.Image:
-    """Ajuste suave de luz, contraste y color según qué tan oscura salió la escena."""
-    brillo = ImageStat.Stat(img.convert("L")).mean[0]
-    factor = min(max(118 / max(brillo, 1), 0.9), 1.35)
-    img = ImageEnhance.Brightness(img).enhance(factor)
-    img = ImageEnhance.Contrast(img).enhance(1.06)
-    return ImageEnhance.Color(img).enhance(1.1)
-
-
-def _llenar(img: Image.Image, ancho: int, alto: int) -> Image.Image:
-    escala = max(ancho / img.width, alto / img.height)
-    img = img.resize((round(img.width * escala), round(img.height * escala)), Image.LANCZOS)
-    x, y = (img.width - ancho) // 2, (img.height - alto) // 2
-    return img.crop((x, y, x + ancho, y + alto))
-
-
-def frase_de(segmentos: list, inicio: float, fin: float, maximo: int = 150) -> str:
-    """La oración más completa dicha dentro del momento (para ponerla sobre la escena)."""
-    textos = [s[2].strip() for s in segmentos if s[1] > inicio and s[0] < fin and s[2].strip()]
-    if not textos:
-        return ""
-    candidatas = [t for t in textos if 40 <= len(t) <= maximo] or textos
-    mejor = max(candidatas, key=lambda t: (t[-1:] in ".?!", min(len(t), maximo)))
-    mejor = textwrap.shorten(mejor, maximo, placeholder="…")
-    return mejor[:1].upper() + mejor[1:]       # la transcripción a veces empieza a media frase
-
-
-def _portada(escena: Image.Image, f: date) -> Image.Image:
-    img = _llenar(_mejorar(escena), ANCHO, ALTO)
-    capa = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
-    dc = ImageDraw.Draw(capa)
-    for i in range(560):   # degradado vino abajo para que se lea el texto
-        dc.line([(0, ALTO - i), (ANCHO, ALTO - i)], fill=(122, 28, 46, int(235 * (1 - i / 560))))
-    img = Image.alpha_composite(img.convert("RGBA"), capa).convert("RGB")
-    d = ImageDraw.Draw(img)
-    ancho = ANCHO - 2 * MARGEN
-    _etiqueta(d, (MARGEN, ALTO - 470), f"Así vivimos el {fechas.nombre_fecha(f).lower()}", VINO_SUAVE, 26)
-    _parrafo(d, (MARGEN, ALTO - 420), _titulo(f), _ajustar(d, _titulo(f), "titulo", 84, ancho, 2), BLANCO, ancho,
-             interlineado=1.05)
-    _pie(d, 1, BLANCO, VINO_LINEA)
-    return img
-
-
-def _escena_con_frase(escena: Image.Image, frase: str, numero: int) -> Image.Image:
-    img, d = _lienzo(VINO)
-    img.paste(_llenar(_mejorar(escena), ANCHO, 760), (0, 0))
-    ancho = ANCHO - 2 * MARGEN
-    d.text((MARGEN - 10, 700), "“", font=_fuente("titulo", 200), fill=VINO_LINEA)
-    texto = frase or "Gracias por acompañarnos."
-    _parrafo(d, (MARGEN, 850), texto, _ajustar(d, texto, "cita", 58, ancho, 5), BLANCO, ancho, interlineado=1.2)
-    _pie(d, numero, BLANCO, VINO_LINEA)
-    return img
-
-
-def _siguiente(f: date) -> Image.Image:
-    img, d = _lienzo(CREMA)
-    _marco(d, VINO_SUAVE)
-    ancho = ANCHO - 2 * MARGEN
-    prox = fechas.proximos_eventos(f + timedelta(1), 7)[0]
-    _cruz(d, (ANCHO / 2, 240), 90, VINO)
-    _etiqueta(d, (0, 330), "El próximo evento", ORO, 30, centrado_en=ANCHO / 2)
-    t = _tema(prox)
-    titulo = t.titulo if t else "Te esperamos"
-    y = _parrafo(d, (MARGEN, 400), titulo, _ajustar(d, titulo, "titulo", 96, ancho, 3), TEXTO, ancho,
-                 interlineado=1.08, centrado=True)
-    fin = _caja_fecha(d, prox, y + 50)
-    _parrafo(d, (MARGEN, fin + 60), "Síguenos y activa las notificaciones para no perdértelo.",
-             _fuente("semi", 40), VINO, ancho, interlineado=1.3, centrado=True)
-    _pie(d, 5, TEXTO, VINO_SUAVE)
-    return img
-
-
-def texto_escenas(f: date, frases: list[str]) -> str:
-    lineas = [f"✨ Así vivimos «{_titulo(f)}»", ""]
-    if frases:
-        lineas += [f"“{frases[0]}”", ""]
-    prox = fechas.proximos_eventos(f + timedelta(1), 7)[0]
-    lineas += [f"Gracias a todos los que nos acompañaron. Te esperamos el {fechas.nombre_fecha(prox).lower()} "
-               "a las 10:00 am (hora CDMX).", "", "Desliza para ver más 👉", "", _hashtags()]
-    return "\n".join(lineas)
-
-
-def carrusel_de_escenas(f: date, video: Path, momentos: list[dict], segmentos: list) -> Paquete | None:
-    """5 láminas: portada con una escena, 3 escenas con su frase y la invitación al siguiente evento."""
-    if not momentos:
-        return None
-    previos = _existentes(f, "carrusel", "despues")
-    rel = f"{f.isoformat()}/escenas" + (f"-{len(previos) + 1}" if previos else "")
-    carpeta = Path(current_app.config["PAQUETES_DIR"]) / rel
-    carpeta.mkdir(parents=True, exist_ok=True)
-    indices = sorted({0, len(momentos) // 2, len(momentos) - 1})
-    elegidos = [momentos[i] for i in indices]
-    while len(elegidos) < 3:
-        elegidos.append(momentos[len(elegidos) % len(momentos)])
-
-    def escena(m: dict, donde: float = 0.5) -> Image.Image:
-        ruta = carpeta / f"_cuadro-{uuid.uuid4().hex[:8]}.png"
-        ffmpeg.cuadro(str(video), m["inicio"] + (m["fin"] - m["inicio"]) * donde, ruta)
-        try:
-            with Image.open(ruta) as im:
-                return im.convert("RGB")
-        finally:
-            ruta.unlink(missing_ok=True)
-
-    frases = [frase_de(segmentos, m["inicio"], m["fin"]) for m in elegidos]
-    laminas = [_portada(escena(momentos[len(momentos) // 2], 0.3), f)]
-    laminas += [_escena_con_frase(escena(m), fr, i) for i, (m, fr) in enumerate(zip(elegidos, frases), start=2)]
-    laminas.append(_siguiente(f))
-    archivos = []
-    for i, img in enumerate(laminas, start=1):
-        img.save(carpeta / f"{i}.png", "PNG", optimize=True)
-        archivos.append(f"{i}.png")
-    return crear_paquete("carrusel", f, f"Carrusel del evento · {_titulo(f)}"[:120],
-                         texto_escenas(f, [x for x in frases if x]), carpeta=rel, archivos=archivos,
-                         datos={"momento": "despues"})

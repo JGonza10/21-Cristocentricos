@@ -1,8 +1,5 @@
-"""Grabación del evento: controlar OBS y subir un video desde otra computadora.
+"""Subir el video limpio del celular desde cualquier computadora del equipo.
 
-    GET  /api/obs                 estado de OBS (instalado, conectado, grabando)
-    POST /api/obs/iniciar         abre OBS si hace falta y empieza a grabar en grabaciones/
-    POST /api/obs/detener         detiene la grabación
     POST /api/grabaciones/subir   sube un video por partes (cabeceras X-Archivo, X-Inicio, X-Total, X-Fecha)
 
 La subida por partes deja trabajar desde la otra computadora (por Tailscale) aunque el video pese
@@ -17,7 +14,7 @@ from urllib.parse import unquote
 
 from flask import Blueprint, current_app, jsonify, request
 
-from .seguridad import login_requerido
+from .seguridad import login_requerido, solo_en_laptop
 
 bp = Blueprint("grabar", __name__, url_prefix="/api")
 
@@ -31,33 +28,6 @@ def _error(mensaje: str, codigo: int = 400, **extra):
     return jsonify(error=mensaje, **extra), codigo
 
 
-@bp.get("/obs")
-@login_requerido
-def obs_estado():
-    from servicios import obs
-    return jsonify(obs.estado())
-
-
-@bp.post("/obs/iniciar")
-@login_requerido
-def obs_iniciar():
-    from servicios import obs
-    try:
-        return jsonify(obs.iniciar())
-    except obs.ErrorObs as e:
-        return _error(str(e), 503)
-
-
-@bp.post("/obs/detener")
-@login_requerido
-def obs_detener():
-    from servicios import obs
-    try:
-        return jsonify(obs.detener())
-    except obs.ErrorObs as e:
-        return _error(str(e), 503)
-
-
 def _nombre_seguro(crudo: str) -> str | None:
     nombre = Path(unquote(crudo or "")).name
     base, ext = os.path.splitext(nombre)
@@ -69,6 +39,7 @@ def _nombre_seguro(crudo: str) -> str | None:
 
 @bp.post("/grabaciones/subir")
 @login_requerido
+@solo_en_laptop
 def subir():
     request.max_content_length = PARTE_MAX
     nombre = _nombre_seguro(request.headers.get("X-Archivo", ""))
@@ -83,8 +54,9 @@ def subir():
     if not 0 < total <= TOTAL_MAX or not 0 <= inicio < total:
         return _error("El tamaño del video no es válido (máximo 20 GB).")
     from agentes import fechas
-    if not fechas.es_dia_de_evento(fecha) or fecha > fechas.hoy_cdmx():
-        return _error("Elige un evento que ya haya pasado (lunes o viernes).")
+    from .temas import es_dia_de_evento
+    if not es_dia_de_evento(fecha) or fecha > fechas.hoy_cdmx():
+        return _error("Elige un evento que ya haya pasado.")
 
     destino = Path(current_app.config["GRABACIONES_DIR"])
     temporal = destino / ".subiendo" / f"{nombre}.parte"

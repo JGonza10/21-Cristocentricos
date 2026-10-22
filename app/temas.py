@@ -1,4 +1,5 @@
-"""Tema de cada evento: tema, guion, intenciones y revisión técnica. /api/temas/...
+"""Tema de cada evento (cualquier día; lunes y viernes son los fijos): tema, guion, intenciones y
+revisión técnica. /api/temas/...
 
     GET /api/temas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD   temas del rango (para el calendario)
     GET /api/temas/<fecha>                             tema de un evento (o null)
@@ -8,8 +9,8 @@
     POST /api/temas/<fecha>/difusion                   arma ya la difusión (5 imágenes)
     GET/POST/DELETE /api/temas/<fecha>/imagen          imagen del tema (va en los reels, p. ej. el Santo Rostro)
 
-Al guardar un tema nuevo o cambiar su título salen las 5 imágenes de difusión y se avisa al equipo
-(correo y Google Calendar) desde el worker.
+Al guardar un tema nuevo o cambiar su título salen las 5 imágenes de difusión y el worker avisa
+al equipo por correo.
 """
 from datetime import date, timedelta
 
@@ -19,8 +20,8 @@ from pathlib import Path
 from flask import Blueprint, current_app, g, jsonify, request, send_file
 
 from .extensiones import db
-from .modelos import CHECKLIST, EventoCalendario, Tema, ahora
-from .seguridad import login_requerido
+from .modelos import CHECKLIST, Tema, ahora
+from .seguridad import login_requerido, solo_en_laptop
 
 bp = Blueprint("temas", __name__, url_prefix="/api/temas")
 
@@ -40,13 +41,13 @@ def _error(e: ErrorTema):
 
 
 def _fecha(texto: str) -> date:
-    from agentes.fechas import es_dia_de_evento
+    """Cualquier día puede tener evento (Gonza, 2026-10-21); lunes y viernes son los fijos."""
     try:
         f = date.fromisoformat(texto)
     except (TypeError, ValueError):
         raise ErrorTema("Fecha no válida.") from None
-    if not es_dia_de_evento(f):
-        raise ErrorTema("Solo hay evento los lunes y viernes.")
+    if not 2020 <= f.year <= 2100:
+        raise ErrorTema("Fecha no válida.")
     return f
 
 
@@ -75,6 +76,20 @@ def titulo_de(f: date) -> str | None:
     return t.titulo if t else None
 
 
+def es_dia_de_evento(f: date) -> bool:
+    """Lunes y viernes siempre; cualquier otro día, si tiene tema guardado."""
+    from agentes.fechas import es_dia_fijo
+    return es_dia_fijo(f) or tema_de(f) is not None
+
+
+def dias_de_evento(desde: date, dias: int) -> list[date]:
+    """Días de evento entre `desde` y `desde + dias` (incluidos): los fijos más los que tienen tema."""
+    from agentes.fechas import proximos_fijos
+    hasta = desde + timedelta(dias)
+    con_tema = {fecha for (fecha,) in db.session.query(Tema.fecha).filter(Tema.fecha >= desde, Tema.fecha <= hasta)}
+    return sorted(set(proximos_fijos(desde, dias)) | con_tema)
+
+
 @bp.get("")
 @login_requerido
 def listar():
@@ -96,7 +111,8 @@ def listar():
 def ver(fecha: str):
     f = _fecha(fecha)
     t = tema_de(f)
-    return jsonify(tema=t.a_dict() if t else None, imagen=_ruta_imagen(f).exists())
+    imagen = not current_app.config["EN_NUBE"] and _ruta_imagen(f).exists()
+    return jsonify(tema=t.a_dict() if t else None, imagen=imagen)
 
 
 # --- Imagen del tema: la que el estilo del cliente pone en los reels («temas/{fecha}») ------
@@ -111,6 +127,7 @@ def _ruta_imagen(f: date) -> Path:
 
 @bp.get("/<fecha>/imagen")
 @login_requerido
+@solo_en_laptop
 def ver_imagen(fecha: str):
     ruta = _ruta_imagen(_fecha(fecha))
     if not ruta.exists():
@@ -120,6 +137,7 @@ def ver_imagen(fecha: str):
 
 @bp.post("/<fecha>/imagen")
 @login_requerido
+@solo_en_laptop
 def subir_imagen(fecha: str):
     """Guarda la imagen como JPG (máx. 1600 px) en estilo_cliente/herramientas/temas/<fecha>.jpg."""
     from PIL import Image, ImageOps, UnidentifiedImageError
@@ -147,6 +165,7 @@ def subir_imagen(fecha: str):
 
 @bp.delete("/<fecha>/imagen")
 @login_requerido
+@solo_en_laptop
 def borrar_imagen(fecha: str):
     _ruta_imagen(_fecha(fecha)).unlink(missing_ok=True)
     return jsonify(imagen=False)
@@ -230,10 +249,6 @@ def guardar(fecha: str):
         if campo in d:
             setattr(t, campo, _texto(d, campo))
     t.actualizado, t.actualizado_por_id = ahora(), g.usuario.id
-    if t.aviso_pendiente:
-        ev = db.session.get(EventoCalendario, f)
-        if ev and ev.estado == "enviada":
-            ev.estado = "pendiente"   # el título del evento en Calendar cambia: se vuelve a sincronizar
     db.session.commit()
     difusion = 0
     if nuevo_titulo and current_app.config.get("DIFUSION_AL_GUARDAR", True):
@@ -242,7 +257,7 @@ def guardar(fecha: str):
 
 
 def _difusion_al_guardar(f: date) -> int:
-    """Versión corta: en cuanto el evento tiene tema (o cambia) salen sus 5 imágenes de difusión.
+    """En cuanto el evento tiene tema (o cambia) salen sus 5 imágenes de difusión.
 
     Si algo falla, el tema ya quedó guardado y el agente lo vuelve a intentar cada 15 minutos.
     """
@@ -320,6 +335,7 @@ def ver_instrucciones(fecha: str):
 
 @bp.post("/<fecha>/difusion")
 @login_requerido
+@solo_en_laptop
 def generar_difusion(fecha: str):
     from agentes.carrusel import preparar_difusion
     f = _fecha(fecha)

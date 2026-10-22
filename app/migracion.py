@@ -21,10 +21,19 @@ def _pragmas_sqlite(conexion, _registro):
         cursor.close()
 
 
+# Tablas de la v1.0 que la versión corta ya no usa (turnos, publicación, reportes, estadísticas).
+TABLAS_VIEJAS = ("publicaciones", "turnos", "eventos_calendario", "bitacora_eventos", "reportes", "seguidores")
+
+
 def migrar() -> list[str]:
-    """Agrega las columnas que falten. Devuelve la lista de lo que agregó."""
+    """Borra las tablas de la v1.0 y agrega las columnas que falten. Devuelve lo que cambió."""
     inspector = inspect(db.engine)
     agregadas = []
+    for tabla in TABLAS_VIEJAS:
+        if inspector.has_table(tabla):
+            with db.engine.begin() as con:
+                con.execute(text(f'DROP TABLE "{tabla}"'))   # nombre fijo de la lista de arriba
+            agregadas.append(f"(se borró la tabla {tabla})")
     for tabla in db.metadata.sorted_tables:
         if not inspector.has_table(tabla.name):
             continue

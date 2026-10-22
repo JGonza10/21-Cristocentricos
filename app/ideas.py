@@ -15,7 +15,7 @@ from flask import Blueprint, abort, current_app, g, jsonify, request, send_file
 
 from .extensiones import db
 from .modelos import Idea, Tema, ahora
-from .seguridad import login_requerido
+from .seguridad import login_requerido, solo_en_laptop
 
 bp = Blueprint("ideas", __name__, url_prefix="/api/ideas")
 
@@ -75,6 +75,7 @@ def crear():
 
 @bp.post("/audio")
 @login_requerido
+@solo_en_laptop
 def crear_audio():
     request.max_content_length = AUDIO_MAX
     tipo = (request.mimetype or "").split(";")[0]
@@ -142,6 +143,7 @@ def usar(iid: int):
 
 @bp.get("/<int:iid>/audio")
 @login_requerido
+@solo_en_laptop
 def audio(iid: int):
     i = _idea(iid)
     if not i.audio or not (_carpeta() / i.audio).exists():

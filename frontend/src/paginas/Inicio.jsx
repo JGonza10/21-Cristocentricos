@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { ahoraCDMX, claveFecha, esDiaDeEvento, nombreFecha, proximoEvento } from '../evento.js'
-import { fechaDeClave, fechaHora, nombres } from '../util.js'
+import { ahoraCDMX, claveFecha, esDiaDeEvento, nombreFecha, proximoEvento, registrarEventos } from '../evento.js'
+import { fechaDeClave, fechaHora } from '../util.js'
 import { AVANCE, calcularVivo, ESTADOS, QUIEN } from '../pasos.js'
 import Flujo from '../componentes/Flujo.jsx'
 import Modal from '../componentes/Modal.jsx'
@@ -11,7 +11,7 @@ import GuionEvento from '../componentes/GuionEvento.jsx'
 import CrearImagenes from '../componentes/CrearImagenes.jsx'
 import Revision from '../componentes/Revision.jsx'
 import { SubirGrabacion } from '../componentes/Grabacion.jsx'
-import { VERSION_CORTA } from '../version.js'
+import { AVISO_LAPTOP, enNube } from '../modo.js'
 import '../styles/inicio.css'
 
 const REFRESCO_MS = 20_000
@@ -26,15 +26,7 @@ function vistaGuardada() {
   try { return localStorage.getItem(CLAVE_VISTA) === 'lista' ? 'lista' : 'tarjetas' } catch { return 'tarjetas' }
 }
 
-function quienes(t) {
-  if (!t || (!t.dirige && t.apoyan.length === 0)) return 'Sin asignar'
-  const partes = []
-  if (t.dirige) partes.push(`Dirige ${t.dirige.nombre}`)
-  if (t.apoyan.length) partes.push(`apoya ${nombres(t.apoyan)}`)
-  return partes.join(' · ')
-}
-
-/** El lunes o viernes anterior/siguiente a una fecha AAAA-MM-DD. */
+/** El evento anterior/siguiente a una fecha AAAA-MM-DD (lunes, viernes o un día con tema). */
 function eventoVecino(clave, direccion) {
   let d = fechaDeClave(clave)
   do d = new Date(d.getTime() + direccion * DIA_MS)
@@ -51,7 +43,6 @@ function abrirReloj() {
 export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirIdeas }) {
   const [ahora, setAhora] = useState(() => new Date())
   const [estado, setEstado] = useState(null)
-  const [turnos, setTurnos] = useState({})
   const [avance, setAvance] = useState(null)
   const [fechaSel, setFechaSel] = useState(null) // null = el evento que toca atender
   const [modal, setModal] = useState(null)       // 'diagrama' | 'calendario' | 'tema' | 'guion' | 'imagenes' | 'subir'
@@ -62,7 +53,6 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   const [aviso, setAviso] = useState('')
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(false)
-  const [ejemploMsg, setEjemploMsg] = useState('')
   const previo = useRef(null)
 
   useEffect(() => {          // el botón del menú lo pide una sola vez; al volver a Inicio no se reabre
@@ -74,8 +64,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   }, [fechaSel])
 
   const cargar = useCallback(() => {
-    api('/api/estado').then(setEstado).catch(() => setEstado(null))
-    api('/api/turnos').then((d) => setTurnos(d.turnos)).catch(() => setTurnos({}))
+    api('/api/estado').then((d) => { registrarEventos(d.eventos_extra); setEstado(d) }).catch(() => setEstado(null))
     cargarAvance()
     setAhora(new Date())
   }, [cargarAvance])
@@ -86,7 +75,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
     return () => clearInterval(t)
   }, [cargar])
 
-  const { pasos, nodos } = calcularVivo(estado, turnos, ahora)
+  const { pasos, nodos } = calcularVivo(estado, ahora)
   const porId = Object.fromEntries((avance?.pasos ?? []).map((p) => [p.id, p]))
   const estadosAvance = Object.fromEntries((avance?.pasos ?? []).map((p) => [p.id, p.estado]))
   const numero = (id) => pasos.findIndex((p) => p.id === id) + 1
@@ -129,23 +118,6 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
     }
   }
 
-  // Solo en la copia de ejemplo (puerto 5022): simula lo que toca en el paso actual.
-  async function ejemplo(accion) {
-    setOcupado(true)
-    setError('')
-    try {
-      const d = await api(`/api/ejemplo/${accion}`, { metodo: 'POST', datos: accion === 'avanzar' ? { fecha: avance?.fecha } : {} })
-      setEjemploMsg(d.mensaje)
-      if (d.avance) { setFechaSel(d.avance.fecha); setAvance(d.avance) } // se queda en este evento aunque termine
-      else { setFechaSel(null); previo.current = null; setAbiertos(null) }
-      cargar()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setOcupado(false)
-    }
-  }
-
   function abrirCalendario(fecha = null) {
     setCalFecha(fecha)
     setModal('calendario')
@@ -162,9 +134,10 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
       case 'tema': return { texto: 'Abrir calendario', hacer: () => abrirCalendario(avance?.fecha) }
       case 'guion': return { texto: 'Agregar guion', hacer: () => setModal('guion') }
       case 'difusion': return { texto: 'Crear imágenes', hacer: () => setModal('imagenes') }
-      case 'reels': return { texto: 'Ver en Material', hacer: () => ir('contenido') }
+      case 'reels': return enNube() ? null : { texto: 'Ver en Material', hacer: () => ir('contenido') }
       case 'revision': return { texto: 'Abrir reloj', hacer: abrirReloj }
-      case 'grabacion': return { texto: 'Subir video del celular', hacer: () => setModal('subir') }
+      case 'grabacion': return enNube() ? { texto: 'Se hace en la laptop', hacer: () => setAviso(AVISO_LAPTOP) }
+        : { texto: 'Subir video del celular', hacer: () => setModal('subir') }
       case 'ideas': return { texto: 'Abrir Ideas', hacer: () => abrirIdeas?.() }
       default: return null
     }
@@ -198,7 +171,6 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
   }
 
   const proximo = proximoEvento(ahora)
-  const tProximo = proximo && turnos[proximo.clave]
   const temas = estado?.temas ?? []
   const temaProximo = proximo && temas.find((t) => t.fecha === proximo.clave)
   const faltanTema = temas.slice(0, 2).filter((t) => !t.tema)
@@ -234,34 +206,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
               ? <><b>{temaProximo.tema}</b> <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Editar</button></>
               : <button className="enlace" onClick={() => abrirTema(proximo.clave)}>Poner tema</button>}
           </p>
-          {!VERSION_CORTA && (tProximo?.dirige ? (
-            <p className="meta" style={{ margin: 0 }}>
-              <b>{quienes(tProximo)}</b>{' '}
-              <button className="enlace" onClick={() => abrirCalendario(proximo.clave)}>Cambiar</button>
-            </p>
-          ) : (
-            <p className="aviso">
-              Todavía no se asigna quién dirige.{' '}
-              <button className="enlace" onClick={() => abrirCalendario(proximo.clave)}>Asignar ahora</button>
-            </p>
-          ))}
           </div>
           <img className="hero-virgen" src="/marca/virgen.png" alt="" aria-hidden="true" width="238" height="800" />
-        </section>
-      )}
-
-      {estado?.ejemplo && (
-        <section className="ejemplo-banda" aria-label="Modo ejemplo">
-          <div>
-            <span className="pill ambar">Modo ejemplo</span>
-            <p>Datos inventados para revisar cómo funciona; tus datos reales no se tocan. «Avanzar el ejemplo» hace lo que
-              haría el sistema (o tú) en el paso actual. También puedes marcar pasos o aprobar en Contenido como en la app real.</p>
-            {ejemploMsg && <p className="ejemplo-msg" role="status">{ejemploMsg}</p>}
-          </div>
-          <div className="botones">
-            <button className="btn chico" disabled={ocupado || avance?.completo} onClick={() => ejemplo('avanzar')}>Avanzar el ejemplo</button>
-            <button className="btn suave chico" disabled={ocupado} onClick={() => ejemplo('reiniciar')}>Reiniciar ejemplo</button>
-          </div>
         </section>
       )}
 
@@ -281,7 +227,7 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
               <div className="evento-nav">
                 <button className="btn suave chico" onClick={() => cambiarEvento(-1)} aria-label="Evento anterior"
                   disabled={eventoVecino(avance.fecha, -1) < claveFecha(ahoraCDMX())}
-                  title="Los eventos pasados ya no se muestran: quedan en la bitácora del reporte semanal">‹</button>
+                  title="Los eventos que ya pasaron no se muestran">‹</button>
                 <b aria-live="polite">{avance.nombre}{avance.tema && <span className="evento-tema"> · {avance.tema}</span>}</b>
                 <button className="btn suave chico" onClick={() => cambiarEvento(1)} aria-label="Evento siguiente">›</button>
                 {fechaSel && <button className="enlace" onClick={() => { setFechaSel(null); previo.current = null }}>Ir al que toca</button>}
@@ -391,8 +337,8 @@ export default function Inicio({ ir, verDiagrama = false, alVerDiagrama, abrirId
           alVerMaterial={() => { setModal(null); ir('contenido') }} />}
       </Modal>
 
-      <Modal abierto={modal === 'calendario'} titulo={VERSION_CORTA ? 'Calendario: fecha y tema' : 'Calendario y equipo'} ancho="medio" alCerrar={() => setModal(null)}>
-        <CalendarioEventos ir={ir} fechaInicial={calFecha} alCambiar={cargar} />
+      <Modal abierto={modal === 'calendario'} titulo="Calendario: fecha y tema" ancho="medio" alCerrar={() => setModal(null)}>
+        <CalendarioEventos fechaInicial={calFecha} alCambiar={cargar} />
       </Modal>
 
       <Modal abierto={modal === 'tema'} titulo={temaFecha ? `Tema del ${nombreFechaCorto(temaFecha).toLowerCase()}` : 'Tema del evento'}

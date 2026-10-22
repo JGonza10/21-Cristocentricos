@@ -1,11 +1,25 @@
-// Fechas de los eventos: lunes (gozosos) y viernes (dolorosos), 10 a 11 am, hora CDMX (UTC-6, sin horario de verano).
+// Fechas de los eventos, 10 a 11 am, hora CDMX (UTC-6, sin horario de verano).
+// Lunes y viernes son los días fijos; cualquier otro día es evento si tiene tema (Gonza, 2026-10-21).
 const DESFASE_CDMX_MS = -6 * 60 * 60 * 1000
 const DIA_MS = 24 * 60 * 60 * 1000
 export const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
   'septiembre', 'octubre', 'noviembre', 'diciembre']
-const MISTERIOS = { 1: 'Misterios gozosos', 5: 'Misterios dolorosos' }
+// Misterios de cada día (getUTCDay: domingo = 0).
+const MISTERIOS = {
+  0: 'Misterios gloriosos', 1: 'Misterios gozosos', 2: 'Misterios dolorosos', 3: 'Misterios gloriosos',
+  4: 'Misterios luminosos', 5: 'Misterios dolorosos', 6: 'Misterios gozosos',
+}
+const DIAS_FIJOS = new Set([1, 5])
+// Días con tema que no son lunes ni viernes (AAAA-MM-DD). Los llena /api/estado y el calendario.
+const extras = new Set()
+
+/** Agrega los días con tema que vienen del servidor (los que no son fijos se vuelven evento). */
+export function registrarEventos(claves) {
+  for (const c of claves ?? []) extras.add(c)
+}
+
 
 const mayus = (t) => t[0].toUpperCase() + t.slice(1)
 
@@ -46,8 +60,12 @@ export function infoEvento(fecha, ahora = new Date()) {
   }
 }
 
+export function esDiaFijo(fecha) {
+  return DIAS_FIJOS.has(fecha.getUTCDay())
+}
+
 export function esDiaDeEvento(fecha) {
-  return fecha.getUTCDay() in MISTERIOS
+  return esDiaFijo(fecha) || extras.has(claveFecha(fecha))
 }
 
 export function proximoEvento(ahora = new Date()) {
@@ -61,7 +79,7 @@ export function proximoEvento(ahora = new Date()) {
   return null
 }
 
-/** Lunes y viernes de esta semana y la siguiente. */
+/** Lunes y viernes de esta semana y la siguiente (los días fijos). */
 export function semanaYSiguiente(ahora = new Date()) {
   const hoy = medianoche(ahoraCDMX(ahora))
   const lunes = new Date(hoy.getTime() - ((hoy.getUTCDay() + 6) % 7) * DIA_MS)

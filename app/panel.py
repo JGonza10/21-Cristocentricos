@@ -6,55 +6,61 @@ from sqlalchemy import func
 
 from .bandeja import conteos
 from .extensiones import db
-from .modelos import EstadoAgente, Grabacion, Idea, Paquete, Publicacion, Reporte, Tema, ahora
+from .modelos import EstadoAgente, Grabacion, Idea, Tema, ahora
 from .seguridad import login_requerido
 
 bp = Blueprint("panel", __name__, url_prefix="/api")
 
 AGENTES = {
     "worker": "Worker",
-    "carrusel": "Difusión",
-    "reels": "Reels",
-    "publicacion": "Publicación",
-    "turnos": "Turnos",
-    "reporte": "Reporte semanal",
-    "avisos": "Avisos del tema",
+    "carrusel": "Imágenes de difusión",
+    "reels": "Reels con el estilo del cliente",
+    "avisos": "Avisos del tema por correo",
     "ideas": "Ideas por voz",
-    "grabacion": "Grabación con OBS (apagada en la versión corta)",
-    "bitacora": "Bitácora de eventos",
 }
-OCULTOS = {"publicacion", "turnos", "reporte", "grabacion"}   # no corren en la versión corta
 LATIDO_MAX = timedelta(minutes=3)
 
 
 def _contar(columna, *filtros) -> dict:
-    """{valor: cantidad} agrupando por una columna (para el diagrama de Inicio)."""
+    """{valor: cantidad} agrupando por una columna."""
     consulta = db.session.query(columna, func.count()).filter(*filtros).group_by(columna)
     return {valor: n for valor, n in consulta.all()}
-
-
-def _por_red() -> dict:
-    """{red: {estado: cantidad}} para pintar cada red en el diagrama."""
-    resultado: dict = {}
-    for red, est, n in db.session.query(Publicacion.red, Publicacion.estado, func.count())             .group_by(Publicacion.red, Publicacion.estado).all():
-        resultado.setdefault(red, {})[est] = n
-    return resultado
-
-
-def _ultimo_reporte() -> dict | None:
-    r = Reporte.query.order_by(Reporte.semana.desc()).first()
-    return {"semana": r.semana.isoformat(), "titulo": r.datos.get("titulo"),
-            "mejorar": len(r.datos.get("mejorar", []))} if r else None
 
 
 def _temas_proximos(dias: int = 14) -> list[dict]:
     """Los eventos de las próximas 2 semanas con su tema (o sin él), para el aviso de Inicio."""
     from agentes import fechas
-    hoy = fechas.hoy_cdmx()
-    lista = fechas.proximos_eventos(hoy, dias)
+
+    from .temas import dias_de_evento
+    lista = dias_de_evento(fechas.hoy_cdmx(), dias)
     temas = {t.fecha: t for t in Tema.query.filter(Tema.fecha.in_(lista)).all()}
     return [{"fecha": f.isoformat(), "tema": temas[f].titulo if f in temas else None,
              "guion": bool(temas[f].guion.strip()) if f in temas else False} for f in lista]
+
+
+def _eventos_extra() -> list[str]:
+    """Días con tema que no son lunes ni viernes (6 meses atrás y 1 año adelante), para el frontend."""
+    from agentes import fechas
+    hoy = fechas.hoy_cdmx()
+    consulta = db.session.query(Tema.fecha).filter(Tema.fecha >= hoy - timedelta(183), Tema.fecha <= hoy + timedelta(366))
+    return [f.isoformat() for (f,) in consulta.order_by(Tema.fecha) if not fechas.es_dia_fijo(f)]
+
+
+def estado_laptop() -> dict:
+    """Lo que solo sabe la laptop (estilo del cliente y Gmail). El worker lo guarda en la base cada
+    5 minutos para que la nube lo muestre; en la laptop se calcula al momento."""
+    from servicios import google
+    return {"estilo": _estilo(), "google": google.configurado()}
+
+
+def _de_la_laptop() -> dict:
+    """En la nube: lo último que reportó la laptop (o vacío si aún no reporta)."""
+    import json
+    e = db.session.get(EstadoAgente, "laptop")
+    try:
+        return json.loads(e.mensaje) if e and e.mensaje else {}
+    except ValueError:
+        return {}
 
 
 def _estilo() -> dict:
@@ -68,43 +74,45 @@ def _estilo() -> dict:
         d = raiz / sub
         return sum(1 for x in d.iterdir() if x.is_file() and x.suffix.lower() in tipos) if d.is_dir() else 0
 
-    r = {"carpeta": str(raiz), "referencia": contar("referencia", estilo.VIDEO),
+    r = {"carpeta": raiz.name, "referencia": contar("referencia", estilo.VIDEO),
          "herramientas": contar("herramientas", estilo.VIDEO | estilo.IMAGEN | estilo.AUDIO | {".ttf", ".otf"}),
          "receta": (raiz / "estilo.json").exists(), "activo": None, "error": None}
     if r["receta"]:
         try:
             r["activo"] = bool(estilo.cargar(raiz).get("activo", True))
         except estilo.ErrorEstilo as e:
-            r["error"] = str(e)
+            r["error"] = str(e)[:120]
     return r
+
+
+@bp.get("/salud")
+def salud():
+    """Para el healthcheck de Railway: responde si la app y la base contestan (sin datos)."""
+    from sqlalchemy import text
+    db.session.execute(text("SELECT 1"))
+    return jsonify(ok=True)
 
 
 @bp.get("/estado")
 @login_requerido
 def estado():
-    from servicios import google, meta, obs
+    laptop = _de_la_laptop() if current_app.config["EN_NUBE"] else estado_laptop()
     registros = {e.nombre: e for e in EstadoAgente.query.all()}
     worker = registros.get("worker")
     activo = bool(worker and worker.latido and ahora() - worker.latido < LATIDO_MAX)
     grabaciones = Grabacion.query.order_by(Grabacion.id.desc()).limit(5).all()
-    corta = current_app.config.get("VERSION_CORTA", True)
     return jsonify(
-        bandeja=conteos(),
-        pendientes_por_tipo=_contar(Paquete.tipo, Paquete.estado == "pendiente"),
+        material=conteos(),
         grabaciones_conteo=_contar(Grabacion.estado),
-        publicaciones_conteo=_contar(Publicacion.estado),
-        publicaciones_por_red=_por_red(),
-        ultimo_reporte=_ultimo_reporte(),
         worker_activo=activo,
         agentes=[{**(registros[n].a_dict() if n in registros else {"nombre": n}), "titulo": t}
-                 for n, t in AGENTES.items() if n != "worker" and not (corta and n in OCULTOS)],
+                 for n, t in AGENTES.items() if n != "worker"],
         grabaciones=[x.a_dict() for x in grabaciones],
-        google=google.configurado(),
-        meta=meta.configurado(),
+        google=bool(laptop.get("google")),
         canal=current_app.config["CANAL_NOMBRE"],
+        modo=current_app.config["MODO"],
         temas=_temas_proximos(),
-        obs=obs.estado(),
-        version_corta=current_app.config.get("VERSION_CORTA", True),
-        estilo=_estilo(),
+        eventos_extra=_eventos_extra(),
+        estilo=laptop.get("estilo") or {},
         ideas_nuevas=Idea.query.filter(Idea.estado.in_(("lista", "transcribiendo"))).count(),
     )

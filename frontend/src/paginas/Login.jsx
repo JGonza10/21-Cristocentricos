@@ -1,3 +1,4 @@
+import { fijarModo } from '../modo.js'
 import { useState } from 'react'
 import { api } from '../api.js'
 
@@ -18,6 +19,7 @@ export default function Login({ alEntrar }) {
     setError('')
     try {
       const d = await api('/api/auth/login', { metodo: 'POST', datos: { usuario, password } })
+      fijarModo(d.modo)
       alEntrar(d.usuario)
     } catch (err) {
       setError(err.message)
@@ -33,7 +35,7 @@ export default function Login({ alEntrar }) {
         <div className="sello" aria-hidden="true">†</div>
         <div className="etiqueta">Sistema del equipo</div>
         <h1 style={{ marginTop: 6 }}>Cristocéntricos</h1>
-        <p className="muted" style={{ marginTop: 8 }}>Entra para revisar y aprobar lo que preparan los agentes.</p>
+        <p className="muted" style={{ marginTop: 8 }}>Entra para preparar cada evento y descargar su material.</p>
 
         <form className="tarjeta" onSubmit={entrar} noValidate>
           <div className="campo">

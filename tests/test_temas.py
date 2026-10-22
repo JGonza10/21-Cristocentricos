@@ -1,12 +1,12 @@
-"""Tema por evento, revisión técnica, instrucciones para Claude, ideas, subida de video, avisos y OBS."""
+"""Tema por evento, revisión técnica, instrucciones para Claude, ideas, subida de video y avisos."""
 import os
 from datetime import date, datetime
 
 import pytest
 
-from agentes import avisos, fechas, grabacion
+from agentes import avisos, fechas
 from app.extensiones import db
-from app.modelos import CHECKLIST, EventoCalendario, Idea, Integrante, Tema
+from app.modelos import CHECKLIST, Idea, Integrante, Tema
 
 from .conftest import enviar, login, token
 
@@ -36,19 +36,35 @@ def test_guardar_tema_y_verlo_en_el_calendario(app, cliente):
 def test_tema_no_valido(cliente):
     login(cliente)
     assert enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "ab"}, metodo="put").status_code == 400
-    assert enviar(cliente, "/api/temas/2026-10-20", {"titulo": "Martes"}, metodo="put").status_code == 400
+    assert enviar(cliente, "/api/temas/2026-13-01", {"titulo": "Mes 13"}, metodo="put").status_code == 400
     assert enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "x" * 121}, metodo="put").status_code == 400
     assert enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "Bien", "guion": 5}, metodo="put").status_code == 400
     assert cliente.get("/api/temas?desde=2026-01-01&hasta=2026-12-31").status_code == 400
 
 
-def test_cambiar_titulo_vuelve_a_avisar_y_resincroniza_calendar(app, cliente):
+def test_cualquier_dia_puede_tener_evento(app, cliente):
+    """Desde el 2026-10-21 el calendario queda abierto: un martes con tema ya es evento."""
+    login(cliente)
+    martes = "2026-10-20"
+    assert cliente.get(f"/api/avance/{martes}").status_code == 400          # sin tema no hay evento
+    r = enviar(cliente, f"/api/temas/{martes}", {"titulo": "Evento especial"}, metodo="put")
+    assert r.status_code == 200
+    d = cliente.get(f"/api/avance/{martes}").get_json()
+    assert d["nombre"] == "Martes 20 de octubre" and d["tema"] == "Evento especial" and d["actual"] == "guion"
+    temas = cliente.get("/api/estado").get_json()["temas"]
+    assert [t["fecha"] for t in temas[:3]] == ["2026-10-19", "2026-10-20", "2026-10-23"]
+    assert cliente.get("/api/avance/activo").get_json()["fecha"] == "2026-10-19"
+    with app.app_context():
+        assert fechas.misterios(date(2026, 10, 20))["tipo"] == "dolorosos"
+        assert fechas.misterios(date(2026, 10, 22))["tipo"] == "luminosos"
+
+
+def test_cambiar_titulo_vuelve_a_avisar(app, cliente):
     login(cliente)
     enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "Primero"}, metodo="put")
     with app.app_context():
         t = db.session.get(Tema, VIERNES)
         t.aviso_pendiente = False
-        db.session.add(EventoCalendario(fecha=VIERNES, estado="enviada", invitados=[]))
         db.session.commit()
     enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "Primero", "notas": "solo notas"}, metodo="put")
     with app.app_context():
@@ -56,7 +72,6 @@ def test_cambiar_titulo_vuelve_a_avisar_y_resincroniza_calendar(app, cliente):
     enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "Otro tema"}, metodo="put")
     with app.app_context():
         assert db.session.get(Tema, VIERNES).aviso_pendiente
-        assert db.session.get(EventoCalendario, VIERNES).estado == "pendiente"
 
 
 def test_revision_tecnica(cliente):
@@ -167,61 +182,10 @@ def test_avisos_esperan_a_que_se_conecte_google(app, monkeypatch):
         assert t.aviso_pendiente and "Google sin conectar" in t.aviso_error
 
 
-@pytest.mark.parametrize("hora, accion", [
-    (datetime(2026, 10, 23, 9, 50, tzinfo=fechas.CDMX), None),
-    (datetime(2026, 10, 23, 9, 56, tzinfo=fechas.CDMX), "iniciar"),
-    (datetime(2026, 10, 23, 10, 59, tzinfo=fechas.CDMX), "iniciar"),
-    (datetime(2026, 10, 23, 11, 6, tzinfo=fechas.CDMX), "detener"),
-    (datetime(2026, 10, 24, 10, 0, tzinfo=fechas.CDMX), None),           # sábado
-])
-def test_grabacion_automatica_con_obs(app, monkeypatch, hora, accion):
-    hechos = []
-    monkeypatch.setattr(grabacion.obs, "instalado", lambda: True)
-    monkeypatch.setattr(grabacion.obs, "iniciar", lambda: hechos.append("iniciar") or {"grabando": True})
-    monkeypatch.setattr(grabacion.obs, "detener", lambda: hechos.append("detener") or {"grabando": False})
-    app.config["OBS_AUTO"] = True
-    with app.app_context():
-        grabacion.tarea(hora)
-    assert hechos == ([accion] if accion else [])
-
-
-def test_obs_sin_configurar_responde_amable(app, cliente, monkeypatch):
-    from servicios import obs
-    monkeypatch.setattr(obs, "instalado", lambda: True)
-    app.config["OBS_PASSWORD"] = ""
-    login(cliente)
-    e = cliente.get("/api/obs").get_json()
-    assert e["instalado"] and not e["conectado"] and "obs-configurar" in e["mensaje"]
-    r = enviar(cliente, "/api/obs/detener")
-    assert r.status_code == 503 and "obs-configurar" in r.get_json()["error"]
-
-
-def test_registro_en_json_y_csv(app, cliente):
-    from app.bandeja import crear_paquete
-    from app.modelos import Grabacion, Publicacion
-    login(cliente)
-    with app.app_context():
-        db.session.add(Tema(fecha=date(2026, 10, 16), titulo="=Fórmula peligrosa"))
-        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=date(2026, 10, 16), estado="lista", duracion=3600))
-        reel = crear_paquete("reel", date(2026, 10, 16), "Reel 1")
-        reel.estado = "aprobado"
-        db.session.add(Publicacion(paquete_id=reel.id, red="youtube", estado="publicado"))
-        db.session.commit()
-    fila = cliente.get("/api/registro").get_json()["registro"][0]
-    assert fila["video"] == "vivo.mkv" and fila["minutos"] == 60 and fila["reels"] == 1 and fila["youtube"] == 1
-    csv = cliente.get("/api/registro.csv")
-    texto = csv.get_data(as_text=True)
-    assert csv.mimetype == "text/csv" and texto.startswith("﻿fecha,evento,tema")
-    assert "'=Fórmula peligrosa" in texto
-
-
 def test_generar_difusion_desde_la_app(app, cliente, monkeypatch):
-    from agentes import carrusel
-    monkeypatch.setattr(carrusel, "_reel_promocional",
-                        lambda f, c: (c.mkdir(parents=True, exist_ok=True), (c / "promo.mp4").write_bytes(b"0")))
     login(cliente)
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").status_code == 409
-    # Versión corta: al guardar el tema salen solas las 5 imágenes (sin reel promocional)
+    # Al guardar el tema salen solas las 5 imágenes
     r = enviar(cliente, f"/api/temas/{VIERNES}", {"titulo": "El perdón"}, metodo="put")
     assert r.get_json()["difusion"] == 1
     assert enviar(cliente, f"/api/temas/{VIERNES}/difusion").get_json()["creados"] == 0
@@ -234,24 +198,3 @@ def test_generar_difusion_desde_la_app(app, cliente, monkeypatch):
         assert Paquete.query.filter_by(tipo="reel").count() == 0
         assert Paquete.query.filter_by(tipo="carrusel").count() == 3
 
-
-def test_estadisticas_por_periodo(app, cliente):
-    from datetime import date
-
-    from app.modelos import Grabacion, Seguidores
-    login(cliente)
-    with app.app_context():
-        db.session.add(Grabacion(nombre="vivo.mkv", fecha_evento=date(2026, 10, 16), estado="lista", duracion=3600))
-        db.session.add(Seguidores(fecha=date(2026, 10, 10), red="instagram", cantidad=120))
-        db.session.commit()
-    d = cliente.get("/api/estadisticas?desde=2026-10-01&hasta=2026-10-31").get_json()
-    fechas_ev = [e["fecha"] for e in d["eventos"]]
-    assert "2026-10-02" not in fechas_ev and "2026-10-16" in fechas_ev        # pasado sin actividad no cuenta
-    assert fechas_ev[-1] == "2026-10-30" and d["resumen"]["eventos"] == 1
-    viernes = next(e for e in d["eventos"] if e["fecha"] == "2026-10-16")
-    assert viernes["minutos"] == 60 and viernes["total"] == 7
-    assert d["seguidores"]["instagram"] == [{"fecha": "2026-10-10", "cantidad": 120}]
-    assert len(d["pasos"]) == 7 and set(d["piezas"]) == {"pendiente", "aprobado", "rechazado"}
-    assert cliente.get("/api/estadisticas?desde=2026-10-31&hasta=2026-10-01").status_code == 400
-    assert cliente.get("/api/estadisticas?desde=2020-01-01&hasta=2026-10-01").status_code == 400
-    assert cliente.get("/api/estadisticas?desde=nada").status_code == 400

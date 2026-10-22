@@ -1,13 +1,12 @@
-"""Agente de reels (fase 4).
+"""Agente de reels.
 
-Cuando llega una grabación a grabaciones/:
-  1. faster-whisper la transcribe (con marcas de tiempo por segmento).
-  2. Se buscan frases clave y se arman candidatos de 30 a 55 s (reglas de CLAUDE.md §2.1).
+Cuando llega el video limpio del celular a grabaciones/:
+  1. faster-whisper lo transcribe (con marcas de tiempo por segmento).
+  2. Se buscan frases clave y se arman candidatos del largo que pide estilo.json.
   3. Se eligen 5 momentos sin traslape, repartidos en el evento.
   4. Cada reel se edita con el estilo del cliente (servicios/estilo.py + estilo_cliente/estilo.json):
-     mejora de luz, enfoque y audio, capas, textos y subtítulos. Sin estilo.json, el look de la v1.0.
-  5. Cada reel queda en Material (pestaña Contenido).
-  6. Solo si CARRUSEL_ESCENAS=1: carrusel de escenas (agentes/carrusel.py).
+     sin pausas, cortes suaves, mejora de luz, enfoque y audio, capas, textos, subtítulos y cierre.
+  5. Cada reel queda en la pestaña Material.
 """
 import re
 import textwrap
@@ -24,7 +23,7 @@ from servicios import estilo, ffmpeg, whisper
 from . import fechas
 
 EXTENSIONES = {".mp4", ".mkv", ".mov", ".webm", ".flv"}
-SEGUNDOS_ESTABLE = 60     # el archivo no debe cambiar en este tiempo (OBS terminó de escribir)
+SEGUNDOS_ESTABLE = 60     # el archivo no debe cambiar en este tiempo (terminó de copiarse)
 DURACION_MIN, DURACION_MAX, DURACION_IDEAL = 30.0, 55.0, 45.0
 RECORTE_MIN, RECORTE_MAX = 5.0, 59.0
 CUANTOS = 5
@@ -126,33 +125,6 @@ def etiqueta(momento: dict) -> str:
     return ETIQUETAS.get(momento.get("tipo"), ETIQUETAS[None])
 
 
-def _tiempo_srt(s: float) -> str:
-    ms = int(round(max(s, 0) * 1000))
-    h, ms = divmod(ms, 3_600_000)
-    m, ms = divmod(ms, 60_000)
-    seg, ms = divmod(ms, 1000)
-    return f"{h:02}:{m:02}:{seg:02},{ms:03}"
-
-
-def srt_para(segmentos: list, inicio: float, fin: float, ancho: int = 28) -> str:
-    """Subtítulos .srt del tramo [inicio, fin], con tiempos desde 0 y máximo 2 renglones."""
-    bloques = []
-    for s0, s1, texto in segmentos:
-        if s1 <= inicio or s0 >= fin or not texto.strip():
-            continue
-        a, b = max(s0, inicio) - inicio, min(s1, fin) - inicio
-        renglones = textwrap.wrap(texto.strip(), ancho)
-        trozos = [renglones[k:k + 2] for k in range(0, len(renglones), 2)]
-        letras = sum(len(" ".join(t)) for t in trozos) or 1
-        t = a
-        for trozo in trozos:
-            dur = (b - a) * len(" ".join(trozo)) / letras
-            bloques.append((t, t + dur, "\n".join(trozo)))
-            t += dur
-    return "\n".join(f"{n}\n{_tiempo_srt(a)} --> {_tiempo_srt(b)}\n{texto}\n"
-                     for n, (a, b, texto) in enumerate(bloques, start=1))
-
-
 def texto_reel(fecha, momento: dict, segmentos: list) -> str:
     frase = " ".join(s[2] for s in segmentos if s[1] > momento["inicio"] and s[0] < momento["fin"])
     frase = textwrap.shorten(frase, 180, placeholder="…") if frase else ""
@@ -174,32 +146,21 @@ def _dir_grabaciones() -> Path:
     return d
 
 
-def _estilo() -> dict | None:
-    """La receta del cliente (estilo_cliente/estilo.json) si está activa; None = estilo de la v1.0."""
-    raiz = Path(current_app.config["ESTILO_DIR"])
-    if not (raiz / "estilo.json").exists():
-        return None
-    receta = estilo.cargar(raiz)
-    return receta if receta.get("activo", True) else None
+def _estilo() -> dict:
+    """La receta del cliente (estilo_cliente/estilo.json), completada con los valores por defecto."""
+    return estilo.cargar(Path(current_app.config["ESTILO_DIR"]))
 
 
 def _render(grab: Grabacion, inicio: float, fin: float, carpeta_rel: str) -> None:
     salida = Path(current_app.config["PAQUETES_DIR"]) / carpeta_rel / "reel.mp4"
-    receta = _estilo()
-    if receta:
-        from app.temas import titulo_de
-        frase = " ".join(s[2] for s in (grab.segmentos or []) if s[1] > inicio and s[0] < fin)
-        valores = {"tema": titulo_de(grab.fecha_evento) or "", "fecha": fechas.nombre_fecha(grab.fecha_evento),
-                   "fecha_iso": grab.fecha_evento.isoformat(),
-                   "canal": current_app.config["CANAL_NOMBRE"], "frase": textwrap.shorten(frase, 90, placeholder="…")}
-        estilo.editar_reel(str(_dir_grabaciones() / grab.nombre), inicio, fin, salida,
-                           Path(current_app.config["ESTILO_DIR"]), Path(current_app.config["FUENTES_DIR"]),
-                           grab.segmentos or [], valores, receta)
-        return
-    ffmpeg.cortar_vertical(
-        str(_dir_grabaciones() / grab.nombre), inicio, fin, srt_para(grab.segmentos or [], inicio, fin),
-        current_app.config["CANAL_NOMBRE"], Path(current_app.config["FUENTES_DIR"]) / "PublicSans_700Bold.ttf",
-        salida, mejorar=current_app.config.get("MEJORAR_VIDEO", True))
+    from app.temas import titulo_de
+    frase = " ".join(s[2] for s in (grab.segmentos or []) if s[1] > inicio and s[0] < fin)
+    valores = {"tema": titulo_de(grab.fecha_evento) or "", "fecha": fechas.nombre_fecha(grab.fecha_evento),
+               "fecha_iso": grab.fecha_evento.isoformat(),
+               "canal": current_app.config["CANAL_NOMBRE"], "frase": textwrap.shorten(frase, 90, placeholder="…")}
+    estilo.editar_reel(str(_dir_grabaciones() / grab.nombre), inicio, fin, salida,
+                       Path(current_app.config["ESTILO_DIR"]), Path(current_app.config["FUENTES_DIR"]),
+                       grab.segmentos or [], valores, _estilo())
 
 
 def procesar(grab: Grabacion) -> list[Paquete]:
@@ -215,7 +176,7 @@ def procesar(grab: Grabacion) -> list[Paquete]:
             grab.segmentos = whisper.transcribir(str(ruta), current_app.config["WHISPER_MODELO"])
             db.session.commit()
         receta = _estilo()
-        largo = (receta or {}).get("duracion") or {}
+        largo = receta.get("duracion") or {}
         momentos = elegir_momentos(grab.segmentos, ffmpeg.silencios(str(ruta)), grab.duracion, CUANTOS,
                                    float(largo.get("min", DURACION_MIN)), float(largo.get("max", DURACION_MAX)),
                                    float(largo.get("ideal", DURACION_IDEAL)))
@@ -236,9 +197,6 @@ def procesar(grab: Grabacion) -> list[Paquete]:
                 texto_reel(grab.fecha_evento, m, grab.segmentos), carpeta=carpeta_rel, archivos=["reel.mp4"],
                 datos={"grabacion_id": grab.id, "inicio": m["inicio"], "fin": m["fin"],
                        "duracion_fuente": grab.duracion, "tipo": m["tipo"], "momento": "despues"}))
-        if current_app.config.get("CARRUSEL_ESCENAS", False):
-            nuevos += _escenas(grab, ruta, momentos)
-            grab = db.session.get(Grabacion, grab.id)
         grab.estado = "lista"
     except Exception as e:  # noqa: BLE001 — cualquier fallo queda registrado y visible
         db.session.rollback()
@@ -255,18 +213,6 @@ def procesar(grab: Grabacion) -> list[Paquete]:
     grab.actualizado = ahora()
     db.session.commit()
     return nuevos
-
-
-def _escenas(grab: Grabacion, ruta: Path, momentos: list) -> list[Paquete]:
-    """Carrusel con escenas del video (v1.0). En la versión corta va apagado (CARRUSEL_ESCENAS=0)."""
-    try:   # el carrusel de escenas es extra: si falla, los reels igual quedan
-        from .carrusel import carrusel_de_escenas
-        p = carrusel_de_escenas(grab.fecha_evento, ruta, momentos, grab.segmentos)
-        return [p] if p else []
-    except Exception:  # noqa: BLE001
-        db.session.rollback()
-        current_app.logger.exception("No se pudo armar el carrusel de escenas de %s", grab.nombre)
-        return []
 
 
 def revisar_carpeta() -> list[Paquete]:
@@ -287,7 +233,7 @@ def revisar_carpeta() -> list[Paquete]:
             continue
         quieto = datetime.now().timestamp() - st.st_mtime >= SEGUNDOS_ESTABLE
         if st.st_size != grab.tamano or not quieto:
-            grab.tamano = st.st_size        # OBS sigue escribiendo
+            grab.tamano = st.st_size        # todavía se está copiando
             db.session.commit()
             continue
         nuevos += procesar(grab)
@@ -295,7 +241,7 @@ def revisar_carpeta() -> list[Paquete]:
 
 
 def aplicar_recortes() -> int:
-    """Regenera los reels a los que alguien les ajustó inicio/fin en la bandeja."""
+    """Vuelve a editar los reels a los que alguien les ajustó inicio/fin en Material."""
     hechos = 0
     for p in Paquete.query.filter_by(tipo="reel", estado="pendiente").all():
         datos = dict(p.datos or {})

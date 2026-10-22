@@ -47,7 +47,6 @@ son píxeles del cuadro de 1080×1920 (esquina superior izquierda), o `"centro"`
 
 ```jsonc
 {
-  "activo": true,                       // false = se usa el look de la versión 1.0
   "formato": {"ancho": 1080, "alto": 1920, "fps": 30,
               "encuadre": "llenar",     // llenar (recorta) · fondo_difuminado · ajustar (barras)
               "foco_y": 0.35},          // con "llenar": 0 = conserva arriba, 0.5 = centro

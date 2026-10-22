@@ -1,4 +1,5 @@
-"""Fábrica de la aplicación Flask de Cristocéntricos Automático."""
+"""Fábrica de la aplicación Flask de Cristocéntricos."""
+import json
 import logging
 import os
 from datetime import timedelta
@@ -8,8 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, send_from_directory
 
-from . import auth, avance, bandeja, cli, equipo, errores, ideas, panel, reportes, temas
-from . import estadisticas, grabar
+from . import auth, avance, bandeja, cli, equipo, errores, grabar, ideas, panel, temas
 from .migracion import migrar
 from .extensiones import csrf, db
 
@@ -53,31 +53,27 @@ def create_app(config: dict | None = None) -> Flask:
         CANAL_NOMBRE=os.environ.get("CANAL_NOMBRE", "Cristocéntricos"),
         CANAL_ENLACE=os.environ.get("CANAL_ENLACE", ""),
         WHISPER_MODELO=os.environ.get("WHISPER_MODELO", "small"),
-        APOYOS_POR_EVENTO=int(os.environ.get("APOYOS_POR_EVENTO", "1")),
-        META_SEGUIDORES=int(os.environ.get("META_SEGUIDORES", "1000")),
-        GOOGLE_CALENDAR_ID=os.environ.get("GOOGLE_CALENDAR_ID", "primary"),
-        META_AUTO=os.environ.get("META_AUTO", "0") == "1",
-        META_PAGE_ID=os.environ.get("META_PAGE_ID", ""),
-        META_IG_USER_ID=os.environ.get("META_IG_USER_ID", ""),
-        META_TOKEN=os.environ.get("META_TOKEN", ""),
-        META_GRAPH_VERSION=os.environ.get("META_GRAPH_VERSION", "v23.0"),
         LOG_DIR=RAIZ / "datos" / "logs",
         IDEAS_DIR=RAIZ / "datos" / "ideas",
-        MEJORAR_VIDEO=os.environ.get("MEJORAR_VIDEO", "1") == "1",   # luz, color y volumen de los reels
-        OBS_PASSWORD=os.environ.get("OBS_PASSWORD", ""),
-        OBS_PUERTO=int(os.environ.get("OBS_PUERTO", "4455")),
-        OBS_AUTO=os.environ.get("OBS_AUTO", "0") == "1",            # versión corta: OBS ya no se usa
-        # Versión corta (2026-10-19): proceso de 7 pasos; turnos, bandeja, publicación, reportes y
-        # estadísticas quedan ocultos (el código sigue ahí por si se reactivan con VERSION_CORTA=0).
-        VERSION_CORTA=os.environ.get("VERSION_CORTA", "1") == "1",
-        REEL_PROMO=os.environ.get("REEL_PROMO", "0") == "1",        # difusión: solo las 5 imágenes
-        CARRUSEL_ESCENAS=os.environ.get("CARRUSEL_ESCENAS", "0") == "1",
+        CUENTAS_NUEVAS=RAIZ / "datos" / "cuentas_nuevas.json",
         DIFUSION_AL_GUARDAR=os.environ.get("DIFUSION_AL_GUARDAR", "1") == "1",
         ESTILO_DIR=Path(os.environ.get("ESTILO_DIR", RAIZ / "estilo_cliente")),
-        EJEMPLO=os.environ.get("EJEMPLO", "0") == "1",  # solo la copia de ejemplo (ejemplo.py)
+        # nube = Railway: solo vigila el avance (sin videos ni archivos); local = la laptop que hace todo.
+        MODO="nube" if os.environ.get("MODO", "local").strip().lower() == "nube" else "local",
     )
     if config:
         app.config.update(config)
+    app.config["EN_NUBE"] = app.config["MODO"] == "nube"
+    app.config["SQLALCHEMY_DATABASE_URI"] = url_base_de_datos(app.config["SQLALCHEMY_DATABASE_URI"])
+    if app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
+        # La laptop llega a la base de Railway por internet: revisar la conexión antes de usarla.
+        app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {"pool_pre_ping": True, "pool_recycle": 300})
+    if app.config["EN_NUBE"]:
+        # Las imágenes las arma la laptop (el worker revisa cada 2 minutos); la nube no guarda archivos.
+        app.config["DIFUSION_AL_GUARDAR"] = False
+        # Railway pone un proxy delante: así se ve la IP real (bloqueo por intentos) y que es HTTPS.
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     if not app.config["SECRET_KEY"]:
         raise RuntimeError("Falta SECRET_KEY en el archivo .env (copia .env.example y llénalo).")
 
@@ -89,14 +85,9 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(equipo.bp)
     app.register_blueprint(panel.bp)
     app.register_blueprint(avance.bp)
-    app.register_blueprint(reportes.bp)
     app.register_blueprint(temas.bp)
     app.register_blueprint(ideas.bp)
-    app.register_blueprint(estadisticas.bp)
     app.register_blueprint(grabar.bp)
-    if app.config["EJEMPLO"]:
-        from . import ejemplo
-        app.register_blueprint(ejemplo.bp)
     errores.registrar(app)
     cli.registrar(app)
     _registrar_frontend(app)
@@ -112,9 +103,57 @@ def create_app(config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
-        for columna in migrar():
-            app.logger.info("Migración: se agregó la columna %s", columna)
+        for cambio in migrar():
+            app.logger.info("Migración: %s", cambio)
+        _cuentas_nuevas(app)
     return app
+
+
+def url_base_de_datos(url: str) -> str:
+    """Railway da «postgres://» o «postgresql://»; SQLAlchemy necesita el driver psycopg 3."""
+    for prefijo in ("postgres://", "postgresql://"):
+        if url.startswith(prefijo):
+            return "postgresql+psycopg://" + url[len(prefijo):]
+    return url
+
+
+def _cuentas_nuevas(app: Flask) -> None:
+    """Da de alta las cuentas de datos/cuentas_nuevas.json con contraseña temporal y borra el archivo.
+
+    Formato: [{"usuario": "esbeidy", "nombre": "Esbeidy Caro", "password_temporal": "..."}].
+    La persona tiene que cambiar la contraseña la primera vez que entra. El archivo vive fuera de git.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from .modelos import Usuario
+    from .seguridad import hashear, normalizar_usuario
+    ruta = Path(app.config["CUENTAS_NUEVAS"])
+    if not ruta.is_file():
+        return
+    try:
+        cuentas = json.loads(ruta.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        app.logger.error("datos/cuentas_nuevas.json no se pudo leer; no se creó ninguna cuenta.")
+        return
+    for c in cuentas if isinstance(cuentas, list) else []:
+        usuario = normalizar_usuario(c.get("usuario"))
+        temporal = c.get("password_temporal")
+        if not usuario or not isinstance(temporal, str) or len(temporal) < 8:
+            app.logger.error("Cuenta nueva no válida en cuentas_nuevas.json: %s", c.get("usuario"))
+            continue
+        if Usuario.query.filter_by(usuario=usuario).first():
+            continue
+        if Usuario.query.count() >= app.config["MAX_USUARIOS"]:
+            app.logger.error("No se creó %s: ya hay %s cuentas (MAX_USUARIOS).", usuario, app.config["MAX_USUARIOS"])
+            continue
+        db.session.add(Usuario(usuario=usuario, nombre=str(c.get("nombre") or usuario)[:80],
+                               hash_password=hashear(temporal), cambiar_password=True))
+        try:
+            db.session.commit()
+            app.logger.info("Cuenta %s creada con contraseña temporal.", usuario)
+        except IntegrityError:              # el servidor y el worker arrancan a la vez
+            db.session.rollback()
+    ruta.unlink(missing_ok=True)            # no dejar la contraseña temporal en un archivo
 
 
 def _configurar_log(app: Flask) -> None:
@@ -124,6 +163,10 @@ def _configurar_log(app: Flask) -> None:
     manejador.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     manejador.setLevel(logging.INFO)
     app.logger.addHandler(manejador)
+    if app.config.get("EN_NUBE"):
+        consola = logging.StreamHandler()
+        consola.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+        app.logger.addHandler(consola)
     app.logger.setLevel(logging.INFO)
 
 

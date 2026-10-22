@@ -49,7 +49,8 @@ export default function Prompter({ texto }) {
     return () => cancelAnimationFrame(id)
   }, [corriendo, velocidad])
 
-  // Karaoke (Gonza, 2026-10-20): cada palabra que cruza la línea dorada de lectura se pinta de oro;
+  // Karaoke (Gonza, 2026-10-20): cada palabra que llega a un tercio de la pantalla (punto de lectura,
+  // sin línea visible desde el 2026-10-21) se pinta de oro;
   // la línea que se está leyendo se resalta más. Se calcula con la posición real de cada palabra,
   // así funciona igual al cambiar el tamaño de letra, en espejo o moviendo el texto a mano.
   useEffect(() => {
@@ -117,7 +118,6 @@ export default function Prompter({ texto }) {
         <span className="chico-texto prompter-ayuda">Espacio: iniciar/pausar · ↑↓ velocidad · +/− letra</span>
       </div>
       <div className="prompter-pantalla">
-        <div className="prompter-guia" aria-hidden="true" />
         <div ref={caja} className={`prompter-texto ${espejo ? 'espejo' : ''}`} style={{ fontSize: `${tamano}px` }} tabIndex={0}>
           <div className="prompter-relleno" />
           {texto.split(/\n{2,}/).map((parrafo, i) => (

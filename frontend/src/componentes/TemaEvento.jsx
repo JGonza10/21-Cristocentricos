@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, enviarCrudo } from '../api.js'
 import { fechaHora } from '../util.js'
+import { enNube } from '../modo.js'
 
 const VACIO = { titulo: '', descripcion: '', cita: '', intenciones: '', guion: '', notas: '' }
 
@@ -123,14 +124,14 @@ export default function TemaEvento({ fecha, alGuardar }) {
         <label htmlFor={`cita-${fecha}`}>Cita bíblica (opcional)</label>
         <input id={`cita-${fecha}`} maxLength={200} placeholder="Ej. Perdona y serás perdonado (Lc 6,37)" {...campo('cita')} />
       </div>
-      <div className="campo">
+      {!enNube() && <div className="campo">
         <label htmlFor={`img-${fecha}`}>Imagen del tema (va al centro de los reels, p. ej. el Santo Rostro)</label>
         {imagen && <img className="tema-imagen" src={`/api/temas/${fecha}/imagen?v=${version}`} alt="Imagen del tema" />}
         <div className="botones">
           <input id={`img-${fecha}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={ocupado} onChange={subirImagen} />
           {imagen && <button className="enlace" type="button" disabled={ocupado} onClick={quitarImagen}>Quitar imagen</button>}
         </div>
-      </div>
+      </div>}
       <div className="campo">
         <label htmlFor={`int-${fecha}`}>Intenciones recibidas</label>
         <textarea id={`int-${fecha}`} rows={3} maxLength={4000} placeholder="Una por renglón. Sin apellidos si no hay permiso." {...campo('intenciones')} />
