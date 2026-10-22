@@ -1,7 +1,7 @@
 # Servidor y base de datos
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-Flask-WTF==1.2.2
+Flask-WTF==1.3.0
 bcrypt==4.3.0
 python-dotenv==1.2.2
 waitress==3.0.2
