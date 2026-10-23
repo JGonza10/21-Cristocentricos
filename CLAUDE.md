@@ -6,7 +6,7 @@ Sistema del equipo Cristocéntricos. **Versión corta (única versión desde 202
 
 La v1.0 (turnos, bandeja de aprobación, publicación, reportes, estadísticas, OBS, Meta, YouTube, Calendar) se **eliminó**; solo queda en el historial de git (commit `0f822f6`). La migración borra sus tablas viejas.
 
-- **Nube + laptop** ([docs/railway.md](docs/railway.md)): Railway (`MODO=nube`, `Dockerfile`, `requirements-nube.txt`) solo vigila el avance; la laptop (`MODO=local`) corre el worker y hace grabación y reels. Comparten el PostgreSQL de Railway (`DATABASE_URL`); los videos nunca suben. Rutas con archivos llevan `@solo_en_laptop` (409 en la nube). `flask --app app copiar-base` pasa la SQLite a Postgres. Sin Railway, sigue funcionando todo local con SQLite y Tailscale.
+- **Nube + laptop** ([docs/railway.md](docs/railway.md)): https://21-cristocentricos-production.up.railway.app (desde 2026-10-22; la laptop usa la base por el TCP proxy en su `.env`). Railway (`MODO=nube`, `Dockerfile`, `requirements-nube.txt`) solo vigila el avance; la laptop (`MODO=local`) corre el worker y hace grabación y reels. Comparten el PostgreSQL de Railway (`DATABASE_URL`); los videos nunca suben. Rutas con archivos llevan `@solo_en_laptop` (409 en la nube). `flask --app app copiar-base` pasa la SQLite a Postgres. Sin Railway, sigue funcionando todo local con SQLite y Tailscale.
 - Repo: https://github.com/JGonza10/21-Cristocentricos
 - Diseño (tokens, colores, componentes; temas Claro y Oro): [docs/diseno.md](docs/diseno.md). Pestañas Inicio · Material · Configuración.
 
