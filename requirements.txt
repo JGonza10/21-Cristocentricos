@@ -9,7 +9,7 @@ psycopg[binary]==3.3.6      # PostgreSQL de Railway (la nube y la laptop compart
 tzdata==2026.5
 
 # Agentes: imágenes, reels (Whisper y ffmpeg), guion desde archivo y avisos por Gmail
-APScheduler==3.11.0
+APScheduler==3.11.3
 watchdog==6.0.0
 Pillow==13.0.0
 pypdf==6.21.1
