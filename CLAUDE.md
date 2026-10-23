@@ -32,6 +32,7 @@ Requiere ffmpeg en el PATH.
 - `servicios/` — **estilo** (edición de reels con la receta `estilo_cliente/estilo.json`: mejora, capas, textos, subtítulos, intro/cierre, música; `analizar` de la referencia), ffmpeg, whisper (faster-whisper local), google + correo (solo Gmail).
 - `frontend/` — React + Vite; tokens en `src/styles/tokens.css`. Prompter sin línea guía.
 - `estilo_cliente/` — `referencia/` (video muestra del cliente), `herramientas/` (sus imágenes y animaciones), `estilo.json`, `LEEME.md`. Comandos: `flask --app app estilo-analizar`, `estilo-probar`.
+- `fondos/` — fondos de imagen por tema (p. ej. «No tengas miedo»: normal, claro y centro).
 - Fuera de git: `datos/` (SQLite), `grabaciones/`, `paquetes/`, `secretos/`, material del cliente en `estilo_cliente/`.
 
 ## Cuentas
